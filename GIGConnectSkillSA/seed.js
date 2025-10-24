@@ -1,14 +1,13 @@
-const { initializeApp } = require("firebase/app");
-const { getFirestore, collection, doc, setDoc, addDoc } = require("firebase/firestore");
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, setDoc, addDoc } from "firebase/firestore";
 
-// IMPORTANT: Replace with your actual Firebase configuration before running the script
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBw6IotQYIYfiTXq0vvMCA9Rk8UleLNaUo",
+  authDomain: "gigconnectskill-sa.firebaseapp.com",
+  projectId: "gigconnectskill-sa",
+  storageBucket: "gigconnectskill-sa.firebasestorage.app",
+  messagingSenderId: "291699433541",
+  appId: "1:291699433541:web:d3b8659e61ec8ad84bc32c"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -69,5 +68,5 @@ const seedDatabase = async () => {
     console.error("Error seeding database: ", error);
   }
 };
-
+console.log("Using Firestore project ID:", db._databaseId.projectId);
 seedDatabase();

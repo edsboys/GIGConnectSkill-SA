@@ -2,9 +2,9 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
-// TODO: Add your own Firebase configuration from your Firebase project console
-// https://firebase.google.com/docs/web/setup#available-libraries
+// Your Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBw6IotQYIYfiTXq0vvMCA9Rk8UleLNaUo",
   authDomain: "gigconnectskill-sa.firebaseapp.com",
@@ -22,4 +22,5 @@ const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-export { auth, db };
+// Export so other files can use them
+export { app, auth, db, analytics };
