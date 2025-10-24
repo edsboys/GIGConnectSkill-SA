@@ -5,15 +5,15 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { auth } from '../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 
-import LoginScreen from '../screens/LoginScreen';
-import SignupScreen from '../screens/SignupScreen';
-import JobFeed from '../screens/JobFeed';
-import JobDetail from '../screens/JobDetail';
-import PostJobScreen from '../screens/PostJobScreen';
-import SubmitProofScreen from '../screens/SubmitProofScreen';
-import WalletScreen from '../screens/WalletScreen';
-import LeaderboardScreen from '../screens/LeaderboardScreen';
-import RatingScreen from '../screens/RatingScreen';
+import LoginScreen from '../app/LoginScreen';
+import SignupScreen from '../app/SignupScreen';
+import JobFeed from '../app/JobFeed';
+import JobDetail from '../app/JobDetail';
+import PostJobScreen from '../app/PostJobScreen';
+import SubmitProofScreen from '../app/SubmitProofScreen';
+import WalletScreen from '../app/WalletScreen';
+import LeaderboardScreen from '../app/LeaderboardScreen';
+import RatingScreen from '../app/RatingScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();

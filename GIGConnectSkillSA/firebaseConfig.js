@@ -1,26 +1,26 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+// firebaseConfig.js
 
-// Your Firebase configuration
+// Import only what you need
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+
+// Your Firebase web config
 const firebaseConfig = {
   apiKey: "AIzaSyBw6IotQYIYfiTXq0vvMCA9Rk8UleLNaUo",
   authDomain: "gigconnectskill-sa.firebaseapp.com",
-  databaseURL: "https://gigconnectskill-sa-default-rtdb.firebaseio.com",
   projectId: "gigconnectskill-sa",
-  storageBucket: "gigconnectskill-sa.firebasestorage.app",
+  storageBucket: "gigconnectskill-sa.appspot.com",
   messagingSenderId: "291699433541",
-  appId: "1:291699433541:web:d3b8659e61ec8ad84bc32c",
-  measurementId: "G-DCMR9LMM5B"
+  appId: "1:291699433541:web:d3b8659e61ec8ad84bc32c"
 };
 
-// Initialize Firebase
+// Initialize Firebase app
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+
+// Initialize services
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Export so other files can use them
-export { app, auth, db, analytics };
+// Export for use in your screens
+export { auth, db };
