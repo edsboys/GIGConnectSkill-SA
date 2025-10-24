@@ -17,7 +17,7 @@ import SignupScreen from '../app/SignupScreen';
 import SubmitProofScreen from '../app/SubmitProofScreen';
 import WalletScreen from '../app/WalletScreen';
 import ProfileScreen from '../app/ProfileScreen'; 
-import LandingScreen from '../app/LandingScreen';// Your landing page
+import LandingScreen from '../app/LandingScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -79,6 +79,16 @@ function MainTabs() {
           ),
         }}
       />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="account" size={size} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -106,30 +116,90 @@ function AppNavigator() {
 
   return (
     <NavigationContainer>
-  <Stack.Navigator
-    screenOptions={{
-      headerStyle: { backgroundColor: '#6200ee' },
-      headerTintColor: 'white',
-      headerTitleStyle: { fontWeight: 'bold' },
-    }}
-  >
-    {user ? (
-      <>
-        {/* Authenticated users: Main app */}
-        <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
-        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
-        {/* other authenticated screens */}
-      </>
-    ) : (
-      <>
-        {/* Unauthenticated users: Landing first */}
-        <Stack.Screen name="Landing" component={LandingScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Signup" component={SignupScreen} options={{ title: 'Create Account', headerBackTitle: 'Back' }} />
-      </>
-    )}
-  </Stack.Navigator>
-</NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: '#6200ee',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      >
+        {user ? (
+          <>
+            {/* Authenticated users: Main app with tabs */}
+            <Stack.Screen 
+              name="Main" 
+              component={MainTabs} 
+              options={{ headerShown: false }} 
+            />
+            
+            {/* Stack screens accessible from tabs */}
+            <Stack.Screen 
+              name="JobDetail" 
+              component={JobDetail}
+              options={{
+                title: 'Job Details',
+                headerBackTitle: 'Back',
+              }}
+            />
+            
+            <Stack.Screen 
+              name="PostJob" 
+              component={PostJobScreen}
+              options={{
+                title: 'Post New Job',
+                headerBackTitle: 'Cancel',
+              }}
+            />
+            
+            <Stack.Screen 
+              name="SubmitProof" 
+              component={SubmitProofScreen}
+              options={{
+                title: 'Submit Proof',
+                headerBackTitle: 'Back',
+              }}
+            />
+            
+            <Stack.Screen 
+              name="Rating" 
+              component={RatingScreen}
+              options={{
+                title: 'Rate Worker',
+                headerBackTitle: 'Back',
+              }}
+            />
+          </>
+        ) : (
+          <>
+            {/* Unauthenticated users: Landing page first */}
+            <Stack.Screen 
+              name="Landing" 
+              component={LandingScreen} 
+              options={{ headerShown: false }} 
+            />
+            
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+            
+            <Stack.Screen 
+              name="Signup" 
+              component={SignupScreen}
+              options={{
+                title: 'Create Account',
+                headerBackTitle: 'Back',
+              }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
