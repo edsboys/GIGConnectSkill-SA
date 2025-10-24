@@ -31,11 +31,39 @@ This prototype was developed for the FNB App of the Year Hackathon.
     - Create a Firestore database.
     - Copy your Firebase project's configuration object into `firebaseConfig.js`.
 
-4.  **Seed the database:**
-    - Run the following command to populate the database with initial data:
+4.  **Seed the database (Important!):**
+    - **Step 4.1: Add Credentials:** Open the `seed.js` file and replace the placeholder `firebaseConfig` object with your actual Firebase project configuration.
+    - **Step 4.2: Temporarily Adjust Security Rules:** By default, your Firestore database is secure and will not allow scripts to write data. To run the seed script, you must temporarily relax these rules.
+        - Go to your Firebase project console -> Firestore Database -> Rules.
+        - Change the rule from `allow read, write: if request.auth != null;` to:
+          ```
+          rules_version = '2';
+          service cloud.firestore {
+            match /databases/{database}/documents {
+              match /{document=**} {
+                // Allow read and write access for a short period to seed data
+                allow read, write: if true;
+              }
+            }
+          }
+          ```
+        - **Publish** the new rules.
+    - **Step 4.3: Run the Script:**
       ```bash
       node seed.js
       ```
+    - **Step 4.4: Secure Your Database Again!** After the script runs successfully, **immediately** change the rules back to the default to protect your database:
+        ```
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /{document=**} {
+              allow read, write: if request.auth != null;
+            }
+          }
+        }
+        ```
+        - **Publish** the secure rules.
 
 5.  **Run the app:**
     - Start the Expo development server:
