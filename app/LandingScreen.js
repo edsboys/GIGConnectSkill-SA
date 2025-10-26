@@ -148,7 +148,7 @@ const LandingScreen = ({ navigation }) => {
 
 // Navigate to job feed or role selection for workers
 
-                navigation.navigate('RoleSelectionLoginScreen', { intendedScreen: 'JobFeed' });
+                navigation.navigate('RoleSelection', { intendedScreen: 'JobFeed' });
 
                 break;
 
@@ -156,7 +156,7 @@ const LandingScreen = ({ navigation }) => {
 
 // Navigate to role selection for clients
 
-                navigation.navigate('RoleSelectionLoginScreen', { intendedScreen: 'PostJob' });
+                navigation.navigate('RoleSelection', { intendedScreen: 'PostJob' });
 
                 break;
 
@@ -164,7 +164,7 @@ const LandingScreen = ({ navigation }) => {
 
 // Navigate to wallet (requires login)
 
-                navigation.navigate('RoleSelectionLoginScreen', { intendedScreen: 'Wallet' });
+                navigation.navigate('RoleSelection', { intendedScreen: 'Wallet' });
 
                 break;
 
@@ -172,13 +172,13 @@ const LandingScreen = ({ navigation }) => {
 
 // Navigate to leaderboard (requires login)
 
-                navigation.navigate('RoleSelectionLoginScreen', { intendedScreen: 'Leaderboard' });
+                navigation.navigate('RoleSelection', { intendedScreen: 'Leaderboard' });
 
                 break;
 
             case 'RoleSelectionLogin':
 
-                navigation.navigate('RoleSelectionLoginScreen');
+                navigation.navigate('RoleSelection');
 
                 break;
 
