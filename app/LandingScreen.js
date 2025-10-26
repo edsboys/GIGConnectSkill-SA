@@ -232,7 +232,7 @@ const LandingScreen = ({ navigation }) => {
                     </View>
                 </View>
                 <View style={styles.footerBottom}>
-                    <Text style={styles.footerCopy}>© 2024 GIG Connect. All rights reserved.</Text>
+                    <Text style={styles.footerCopy}>© 2025 GIG Connect. All rights reserved.</Text>
                     <View style={styles.footerLegalLinks}>
                         <Text style={styles.footerLegalLink}>Privacy Policy</Text>
                         <Text style={styles.footerLegalLink}>Terms of Service</Text>
