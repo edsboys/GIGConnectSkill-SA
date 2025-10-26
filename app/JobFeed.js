@@ -7,8 +7,8 @@ import {
     Text,
     Image,
     Alert,
-    Platform,
-    KeyboardAvoidingView
+    Platform, // Added
+    KeyboardAvoidingView // Added
 } from 'react-native';
 import {
     Card,
@@ -19,30 +19,29 @@ import {
     DefaultTheme,
     Subheading,
     Searchbar,
-    TextInput,
-    HelperText
+    TextInput, // Added
+    HelperText // Added
 } from 'react-native-paper';
 import { Icon } from 'react-native-elements';
 import { db, auth } from '../firebaseConfig';
+// Updated imports for adding data and getting server timestamp
 import { collection, doc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-
-
 const COLORS = {
     background: '#F8FAFC',
     cardBackground: '#FFFFFF',
     text: '#1E293B',
     textSecondary: '#64748B',
-    primary: '#F97316',
+    primary: '#F97316', // Orange accent
     primaryLight: '#FFF7ED',
     border: '#E2E8F0',
     iconBg: '#F1F5F9',
     star: '#FBBF24',
     online: '#10B981',
-    error: '#EF4444',
+    error: '#EF4444', // For validation errors
 };
 
-
+// Theme (same as before)
 const theme = {
     ...DefaultTheme,
     roundness: 8,
@@ -56,11 +55,9 @@ const theme = {
         placeholder: COLORS.textSecondary,
         onSurface: COLORS.text,
         outline: COLORS.border,
-        error: COLORS.error,
+        error: COLORS.error, // Add error color
     },
 };
-
-
 const SidebarNavItem = ({ icon, label, active, onPress }) => (
     <TouchableOpacity
         style={[styles.sidebarNavItem, active && styles.sidebarNavItemActive]}
@@ -73,21 +70,23 @@ const SidebarNavItem = ({ icon, label, active, onPress }) => (
 
 
 const PostJobScreen = ({ navigation }) => {
-    const [activeScreen, setActiveScreen] = useState('Post Job');
+    // --- State for Sidebar and User ---
+    const [activeScreen, setActiveScreen] = useState('Post Job'); // Set initial active screen
     const [searchQuery, setSearchQuery] = useState('');
-    const [currentUser, setCurrentUser] = useState({ name: 'Loading...', email: '', avatarInitial: '', uid: null });
+    const [currentUser, setCurrentUser] = useState({ name: 'Loading...', email: '', avatarInitial: '', uid: null }); // Added uid
 
+    // --- State for Form ---
     const [jobTitle, setJobTitle] = useState('');
     const [description, setDescription] = useState('');
     const [location, setLocation] = useState('');
     const [price, setPrice] = useState('');
-    const [skills, setSkills] = useState('');
-    const [category, setCategory] = useState('');
-    const [jobType, setJobType] = useState('Full-time');
+    const [skills, setSkills] = useState(''); // Simple comma-separated string for now
+    const [category, setCategory] = useState(''); // Example categories
+    const [jobType, setJobType] = useState('Full-time'); // Example job types
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
 
-
+    // --- Fetch User Data Effect --- (Mostly unchanged)
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -98,52 +97,52 @@ const PostJobScreen = ({ navigation }) => {
                     if (userDoc.exists()) {
                         const userData = userDoc.data();
                         setCurrentUser({
-                            uid: user.uid,
+                            uid: user.uid, // Store UID
                             name: userData.name || 'User',
                             email: userData.email || '',
                             avatarInitial: userData.name ? userData.name.charAt(0).toUpperCase() : 'U'
                         });
-
-                        if (userData.role !== 'client') {
-                            Alert.alert("Access Denied", "Only clients can post jobs.");
-                            navigation.navigate('Home');
-                        }
+                        // Redirect if user is not a client? Optional.
+                        // if (userData.role !== 'client') {
+                        //    Alert.alert("Access Denied", "Only clients can post jobs.");
+                        //    navigation.navigate('Home'); // Or appropriate screen
+                        // }
                     } else {
                         console.log("No such user document!");
                         setCurrentUser({ uid: null, name: 'User', email: '', avatarInitial: 'U' });
-                        navigation.navigate('Login');
+                        // navigation.navigate('Login'); // Redirect if no user doc
                     }
                 } else {
                     console.log("No user logged in");
                     setCurrentUser({ uid: null, name: 'User', email: '', avatarInitial: 'U' });
-                    navigation.navigate('Login');
+                    navigation.navigate('Login'); // Redirect if no user logged in
                 }
             } catch (error) {
                 console.error("Error fetching user data: ", error);
                 setCurrentUser({ uid: null, name: 'User', email: '', avatarInitial: 'U' });
-                navigation.navigate('Login');
+                // navigation.navigate('Login');
             }
         };
 
         fetchUserData();
     }, [navigation]);
 
-
+    // --- Form Validation ---
     const validateForm = () => {
         const newErrors = {};
         if (!jobTitle.trim()) newErrors.jobTitle = 'Job title is required';
         if (!description.trim()) newErrors.description = 'Description is required';
         if (!location.trim()) newErrors.location = 'Location is required';
         if (!price.trim() || isNaN(price) || parseFloat(price) <= 0) newErrors.price = 'Valid price is required';
-        if (!category.trim()) newErrors.category = 'Category is required';
-
+        if (!category.trim()) newErrors.category = 'Category is required'; // Basic check
+        // Add more validation as needed (e.g., skills format)
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        return Object.keys(newErrors).length === 0; // Return true if no errors
     };
 
-
+    // --- Handle Job Posting ---
     const handlePostJob = async () => {
-        if (!validateForm()) return;
+        if (!validateForm()) return; // Stop if validation fails
 
         if (!currentUser.uid) {
             Alert.alert("Error", "User not identified. Please log in again.");
@@ -158,17 +157,19 @@ const PostJobScreen = ({ navigation }) => {
                 description: description.trim(),
                 location: location.trim(),
                 price: parseFloat(price),
-                skills: skills.split(',').map(s => s.trim()).filter(s => s),
+                skills: skills.split(',').map(s => s.trim()).filter(s => s), // Split comma-separated skills
                 category: category.trim(),
                 jobType: jobType.trim(),
-                clientId: currentUser.uid,
-                clientName: currentUser.name,
-                postedDate: serverTimestamp(),
-                status: 'open',
+                clientId: currentUser.uid, // Link job to the client
+                clientName: currentUser.name, // Store client name for display
+                postedDate: serverTimestamp(), // Use server timestamp
+                status: 'open', // Initial status
+                // Add companyName if available from user profile or another field
+                // companyName: currentUser.company || 'Unknown Client',
             });
 
             Alert.alert("Success", "Job posted successfully!");
-
+            // Optionally clear form and navigate away
             setJobTitle('');
             setDescription('');
             setLocation('');
@@ -177,7 +178,7 @@ const PostJobScreen = ({ navigation }) => {
             setCategory('');
             setJobType('Full-time');
             setErrors({});
-            navigation.navigate('Home');
+            navigation.navigate('Home'); // Navigate back home or to a "My Postings" screen
 
         } catch (error) {
             console.error("Error posting job: ", error);
@@ -187,13 +188,14 @@ const PostJobScreen = ({ navigation }) => {
         }
     };
 
-
+    // --- Navigation Handlers --- (same as before)
     const handleSidebarNav = (screenName) => {
         setActiveScreen(screenName);
         let targetScreen = 'Home';
-        if (screenName === 'My Jobs') targetScreen = 'MyJobs';
+        if (screenName === 'My Jobs') targetScreen = 'MyJobs'; // Or 'ClientJobs'
         else if (screenName === 'Profile') targetScreen = 'Profile';
-        else if (screenName === 'Post Job') return;
+        // Add mapping for 'Post Job' if you want it clickable again
+        else if (screenName === 'Post Job') return; // Already here
         navigation.navigate(targetScreen);
     };
 
@@ -201,18 +203,18 @@ const PostJobScreen = ({ navigation }) => {
         try {
             await signOut(auth);
             console.log('User signed out successfully');
-
+            // Auth listener should handle navigation to Login
         } catch (error) {
             console.error("Error signing out: ", error);
             Alert.alert('Error', 'Could not sign out.');
         }
     };
 
-
+    // --- Form UI ---
     return (
         <PaperProvider theme={theme}>
             <View style={styles.root}>
-
+                {/* --- Left Column: Sidebar --- (Adapted active state) */}
                 <View style={styles.sidebar}>
                     <View style={styles.sidebarHeader}>
                         <View style={[styles.sidebarLogoBg, { backgroundColor: COLORS.primaryLight }]}>
@@ -224,10 +226,10 @@ const PostJobScreen = ({ navigation }) => {
                         </View>
                     </View>
                     <View style={styles.sidebarNav}>
-
+                        {/* Make sure screen names match your navigator */}
                         <SidebarNavItem icon="home" label="Home" active={activeScreen === 'Home'} onPress={() => handleSidebarNav('Home')}/>
                         <SidebarNavItem icon="briefcase" label="My Jobs" active={activeScreen === 'My Jobs'} onPress={() => handleSidebarNav('My Jobs')}/>
-                        <SidebarNavItem icon="plus-circle" label="Post Job" active={activeScreen === 'Post Job'} onPress={() => { }}/>
+                        <SidebarNavItem icon="plus-circle" label="Post Job" active={activeScreen === 'Post Job'} onPress={() => { /* Already here */ }}/>
                         <SidebarNavItem icon="user" label="Profile" active={activeScreen === 'Profile'} onPress={() => handleSidebarNav('Profile')}/>
                     </View>
                     <View style={styles.sidebarFooter}>
@@ -240,7 +242,6 @@ const PostJobScreen = ({ navigation }) => {
                                 <Text style={styles.userEmail}>{currentUser.email}</Text>
                             </View>
                         </View>
-
                         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
                             <Icon name="sign-out-alt" type="font-awesome-5" size={16} color={COLORS.textSecondary}/>
                             <Text style={styles.signOutText}>Sign Out</Text>
@@ -248,15 +249,15 @@ const PostJobScreen = ({ navigation }) => {
                     </View>
                 </View>
 
-
+                {/* --- Right Column: Main Content (Form) --- */}
                 <KeyboardAvoidingView
-                    style={{ flex: 1 }}
+                    style={{ flex: 1 }} // Take remaining space
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
                 >
                     <ScrollView style={styles.mainContent}>
-
+                        {/* Header inside Main Content */}
                         <View style={styles.mainHeader}>
-
+                            {/* Removed Searchbar, Title instead */}
                             <Title style={styles.mainTitle}>Post a New Job</Title>
                             <View style={styles.headerActions}>
                                 <TouchableOpacity style={styles.actionIcon}>
@@ -268,13 +269,13 @@ const PostJobScreen = ({ navigation }) => {
                             </View>
                         </View>
 
-
+                        {/* --- *** Form Content *** --- */}
                         <View style={styles.formGrid}>
                             <Card style={styles.formCard}>
                                 <Card.Content>
                                     <Subheading style={styles.formSectionTitle}>Job Details</Subheading>
 
-
+                                    {/* Job Title */}
                                     <TextInput
                                         mode="outlined"
                                         label="Job Title"
@@ -286,7 +287,7 @@ const PostJobScreen = ({ navigation }) => {
                                     />
                                     <HelperText type="error" visible={!!errors.jobTitle}>{errors.jobTitle}</HelperText>
 
-
+                                    {/* Description */}
                                     <TextInput
                                         mode="outlined"
                                         label="Description"
@@ -300,7 +301,7 @@ const PostJobScreen = ({ navigation }) => {
                                     />
                                     <HelperText type="error" visible={!!errors.description}>{errors.description}</HelperText>
 
-
+                                    {/* Location */}
                                     <TextInput
                                         mode="outlined"
                                         label="Location (e.g., Sandton, Johannesburg)"
@@ -313,7 +314,7 @@ const PostJobScreen = ({ navigation }) => {
                                     />
                                     <HelperText type="error" visible={!!errors.location}>{errors.location}</HelperText>
 
-
+                                    {/* Price */}
                                     <TextInput
                                         mode="outlined"
                                         label="Price/Budget (R)"
@@ -321,13 +322,13 @@ const PostJobScreen = ({ navigation }) => {
                                         onChangeText={setPrice}
                                         style={styles.input}
                                         keyboardType="numeric"
-                                        left={<TextInput.Icon icon="currency-usd" color={COLORS.textSecondary}/>}
+                                        left={<TextInput.Icon icon="currency-usd" color={COLORS.textSecondary}/>} // using usd icon as placeholder
                                         error={!!errors.price}
                                         disabled={loading}
                                     />
                                     <HelperText type="error" visible={!!errors.price}>{errors.price}</HelperText>
 
-
+                                    {/* Skills */}
                                     <TextInput
                                         mode="outlined"
                                         label="Required Skills (comma-separated)"
@@ -335,12 +336,12 @@ const PostJobScreen = ({ navigation }) => {
                                         onChangeText={setSkills}
                                         style={styles.input}
                                         left={<TextInput.Icon icon="tools" color={COLORS.textSecondary}/>}
-                                        error={!!errors.skills}
+                                        error={!!errors.skills} // Add validation if needed
                                         disabled={loading}
                                     />
                                     <HelperText type="info">e.g., Plumbing, Wiring, Painting</HelperText>
 
-
+                                    {/* Category (Using TextInput for now, replace with Picker if needed) */}
                                     <TextInput
                                         mode="outlined"
                                         label="Category"
@@ -354,7 +355,7 @@ const PostJobScreen = ({ navigation }) => {
                                     />
                                     <HelperText type="error" visible={!!errors.category}>{errors.category}</HelperText>
 
-
+                                    {/* Job Type (Using TextInput for now, replace with Picker if needed) */}
                                     <TextInput
                                         mode="outlined"
                                         label="Job Type"
@@ -363,12 +364,12 @@ const PostJobScreen = ({ navigation }) => {
                                         onChangeText={setJobType}
                                         style={styles.input}
                                         left={<TextInput.Icon icon="clock-time-four-outline" color={COLORS.textSecondary}/>}
-                                        error={!!errors.jobType}
+                                        error={!!errors.jobType} // Add validation if needed
                                         disabled={loading}
                                     />
                                     <HelperText type="error" visible={!!errors.jobType}>{errors.jobType}</HelperText>
 
-
+                                    {/* Submit Button */}
                                     <Button
                                         mode="contained"
                                         onPress={handlePostJob}
@@ -391,14 +392,14 @@ const PostJobScreen = ({ navigation }) => {
     );
 };
 
-
+// --- Styles ---
 const styles = StyleSheet.create({
     root: {
         flex: 1,
         flexDirection: 'row',
         backgroundColor: COLORS.background,
     },
-
+    // Sidebar Styles (mostly unchanged)
     sidebar: {
         width: 260,
         backgroundColor: COLORS.cardBackground,
@@ -498,21 +499,21 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginLeft: 12 + 25,
     },
-
+    // Main Content Styles
     mainContent: {
         flex: 1,
         backgroundColor: COLORS.background,
     },
     mainHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'space-between', // Adjust alignment
         alignItems: 'center',
         padding: 30,
         backgroundColor: COLORS.cardBackground,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.border,
     },
-    mainTitle: {
+    mainTitle: { // Style for the title replacing searchbar
         fontSize: 24,
         fontWeight: 'bold',
         color: COLORS.text,
@@ -521,21 +522,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
-
+        // Removed marginLeft
     },
     actionIcon: {
         padding: 8,
     },
-    formGrid: {
+    formGrid: { // Renamed from dashboardGrid
         padding: 30,
     },
-
+    // --- Styles for Post Job Form ---
     formCard: {
         backgroundColor: COLORS.cardBackground,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: COLORS.border,
-        marginBottom: 30,
+        marginBottom: 30, // Space at the bottom
     },
     formSectionTitle: {
         fontSize: 18,
@@ -544,25 +545,25 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     input: {
-        backgroundColor: COLORS.cardBackground,
-        marginBottom: 0,
+        backgroundColor: COLORS.cardBackground, // Inputs have white background inside card
+        marginBottom: 0, // Remove default margin bottom from input
     },
     multilineInput: {
-        height: 100,
-        textAlignVertical: 'top',
+        height: 100, // Specific height for multiline
+        textAlignVertical: 'top', // Start text from top
     },
     helperText: {
-        marginBottom: 16,
-        marginTop: 4,
+        marginBottom: 16, // Space below helper text
+        marginTop: 4,     // Space above helper text
         fontSize: 12,
-        color: COLORS.textSecondary,
-
+        color: COLORS.textSecondary, // Default info color
+        // Error color is handled by theme
     },
     submitButton: {
         backgroundColor: COLORS.primary,
         borderRadius: 6,
         paddingVertical: 8,
-        marginTop: 24,
+        marginTop: 24, // Space above button
     },
     submitButtonLabel: {
         fontSize: 16,
@@ -573,5 +574,4 @@ const styles = StyleSheet.create({
 
 });
 
-export default PostJobScreen;
-
+export default PostJobScreen; // Renamed component export

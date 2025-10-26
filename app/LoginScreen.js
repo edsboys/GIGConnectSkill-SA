@@ -1,4 +1,3 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
 import {
@@ -8,7 +7,7 @@ import {
     ScrollView,
     StyleSheet,
     View,
-    Image,
+    // Image, // Logo is still commented out to prevent crashing
     Text,
     TouchableOpacity,
     StatusBar
@@ -17,40 +16,41 @@ import {
     Button,
     HelperText,
     TextInput,
-    Title,
     Provider as PaperProvider,
     DefaultTheme,
-    Checkbox
 } from 'react-native-paper';
 import { Icon } from 'react-native-elements';
 import { auth } from '../firebaseConfig';
 
-// Color palette from refer.jpg
-const COLORS = {
-    background: '#1F1D2B',
-    primary: '#E91E63',
-    text: '#FFFFFF',
-    textSecondary: '#9A9A9A',
-    inputBorder: '#E91E63',
-    inputBackground: '#2D2D3A',
+// --- Color Palette Based on Image ---
+const LIGHT_COLORS = {
+    background: '#FFFFFF',
+    primary: '#7B68EE', // A purple matching the image
+    text: '#333333',
+    textSecondary: '#888888',
+    inputBackground: '#F5F5F5',
+    inputBorder: '#E0E0E0',
+    white: '#FFFFFF',
+    google: '#DB4437', // Google's brand red
+    facebook: '#4267B2', // Facebook's brand blue
 };
 
-// Dark theme
+// --- Light Theme for React Native Paper ---
 const theme = {
     ...DefaultTheme,
-    dark: true,
+    dark: false, // Use light mode
     colors: {
         ...DefaultTheme.colors,
-        primary: COLORS.primary,
-        accent: COLORS.primary,
-        background: 'transparent',
-        surface: COLORS.inputBackground,
-        text: COLORS.text,
-        placeholder: COLORS.textSecondary,
-        onSurface: COLORS.text,
-        outline: COLORS.inputBorder,
+        primary: LIGHT_COLORS.primary,
+        accent: LIGHT_COLORS.primary,
+        background: LIGHT_COLORS.background,
+        surface: LIGHT_COLORS.inputBackground, // Background for 'filled' TextInput
+        text: LIGHT_COLORS.text,
+        placeholder: LIGHT_COLORS.textSecondary,
+        onSurface: LIGHT_COLORS.text,
+        outline: 'transparent', // No border for 'filled' mode
     },
-    roundness: 12,
+    roundness: 10, // Rounded corners for inputs
 };
 
 const LoginScreen = ({ navigation }) => {
@@ -60,8 +60,6 @@ const LoginScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState({ email: '', password: '' });
-    const [rememberMe, setRememberMe] = useState(false);
-    const [roleSelection, setRoleSelection] = useState(null); // 'client', 'worker', or null
 
     // --- Validation and Login Logic (Unchanged) ---
     const validateEmail = (email) => {
@@ -85,11 +83,8 @@ const LoginScreen = ({ navigation }) => {
         try {
             setLoading(true);
             setErrors({ email: '', password: '' });
-            // The roleSelection state is just for UI flow before login.
-            // Firebase auth determines the actual user.
             const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-            // Post-login navigation should ideally happen based on the user's
-            // role fetched from Firestore in your AppNavigator/auth listener.
+            // Successful login, navigation will be handled by your auth listener
         } catch (error) {
             setLoading(false);
             let errorMessage = 'Login failed. Please try again.';
@@ -102,316 +97,227 @@ const LoginScreen = ({ navigation }) => {
         }
     };
 
-    // --- Render Role Selection View ---
-    const renderRoleSelection = () => (
-        <View style={styles.roleSelectionContainer}>
-            <Title style={styles.roleTitle}>Log In As</Title>
-            <TouchableOpacity
-                style={styles.roleButton}
-                onPress={() => setRoleSelection('client')}
-                disabled={loading}
-            >
-                <Icon name="user-tie" type="font-awesome-5" color={COLORS.primary} size={40} />
-                <Text style={styles.roleButtonText}>Client</Text>
-                <Text style={styles.roleButtonSubtitle}>(I want to hire)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={styles.roleButton}
-                onPress={() => setRoleSelection('worker')}
-                disabled={loading}
-            >
-                <Icon name="hard-hat" type="font-awesome-5" color={COLORS.primary} size={40} />
-                <Text style={styles.roleButtonText}>Worker</Text>
-                <Text style={styles.roleButtonSubtitle}>(I'm looking for work)</Text>
-            </TouchableOpacity>
-            {/* Optional: Add Signup link here too if desired */}
-            <View style={styles.footerContainerAlt}>
-                <Text style={styles.footerText}>Don't have an account? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Signup')} disabled={loading}>
-                    <Text style={styles.footerLink}>Sign up</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
-
-    // --- Render Login Form View ---
-    const renderLoginForm = () => (
-        <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-        >
-            {/* Go Back Button */}
-            <TouchableOpacity style={styles.goBackButton} onPress={() => setRoleSelection(null)}>
-                <Icon name="arrow-left" type="font-awesome-5" color={COLORS.textSecondary} size={16} />
-                <Text style={styles.goBackText}>Choose Role</Text>
-            </TouchableOpacity>
-
-            <Title style={styles.title}>Log In as {roleSelection === 'client' ? 'Client' : 'Worker'}</Title>
-
-            {/* Input Fields */}
-            <View style={styles.formContainer}>
-                <TextInput
-                    label="Email"
-                    value={email}
-                    onChangeText={(text) => {
-                        setEmail(text);
-                        if (errors.email) setErrors({ ...errors, email: '' });
-                    }}
-                    style={styles.input}
-                    mode="outlined"
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    left={<TextInput.Icon icon="account" color={COLORS.textSecondary} />}
-                    error={!!errors.email}
-                    disabled={loading}
-                />
-                {errors.email ? (
-                    <HelperText type="error" visible={!!errors.email} style={styles.helperText}>
-                        {errors.email}
-                    </HelperText>
-                ) : null}
-
-                <TextInput
-                    label="Password"
-                    value={password}
-                    onChangeText={(text) => {
-                        setPassword(text);
-                        if (errors.password) setErrors({ ...errors, password: '' });
-                    }}
-                    secureTextEntry={!showPassword}
-                    style={styles.input}
-                    mode="outlined"
-                    left={<TextInput.Icon icon="lock" color={COLORS.textSecondary} />}
-                    right={
-                        <TextInput.Icon
-                            icon="eye"
-                            color={COLORS.textSecondary}
-                            onPress={() => setShowPassword(!showPassword)}
-                        />
-                    }
-                    error={!!errors.password}
-                    disabled={loading}
-                />
-                {errors.password ? (
-                    <HelperText type="error" visible={!!errors.password} style={styles.helperText}>
-                        {errors.password}
-                    </HelperText>
-                ) : null}
-
-                {/* Options Row */}
-                <View style={styles.optionsRow}>
-                    <Checkbox.Item
-                        label="Remember me"
-                        status={rememberMe ? 'checked' : 'unchecked'}
-                        onPress={() => setRememberMe(!rememberMe)}
-                        style={styles.checkboxContainer}
-                        labelStyle={styles.checkboxLabel}
-                        color={COLORS.primary}
-                        uncheckedColor={COLORS.textSecondary}
-                    />
-                    <TouchableOpacity onPress={() => Alert.alert('Coming Soon', 'Password reset will be available soon.')}>
-                        <Text style={styles.forgotLink}>Forgot Password</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Login Button */}
-                <Button
-                    mode="contained"
-                    onPress={handleLogin}
-                    style={styles.button}
-                    labelStyle={styles.buttonLabel}
-                    loading={loading}
-                    disabled={loading}
-                >
-                    {loading ? 'Logging in...' : 'Log In'}
-                </Button>
-
-                {/* Divider */}
-                <View style={styles.dividerContainer}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>Or Sign in with</Text>
-                    <View style={styles.dividerLine} />
-                </View>
-
-                {/* Social Icons */}
-                <View style={styles.socialRow}>
-                    <TouchableOpacity style={styles.socialButton}>
-                        <Icon name="facebook-f" type="font-awesome-5" color={COLORS.primary} size={20} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.socialButton}>
-                        <Icon name="twitter" type="font-awesome-5" color={COLORS.primary} size={20} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.socialButton}>
-                        <Icon name="google" type="font-awesome-5" color={COLORS.primary} size={20} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.socialButton}>
-                        <Icon name="instagram" type="font-awesome-5" color={COLORS.primary} size={20} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Sign Up Link */}
-                <View style={styles.footerContainer}>
-                    <Text style={styles.footerText}>Don't have an account? </Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Signup')} disabled={loading}>
-                        <Text style={styles.footerLink}>Sign up</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </ScrollView>
-    );
-
+    // --- Render Login Form ---
     return (
         <PaperProvider theme={theme}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="dark-content" backgroundColor={LIGHT_COLORS.background} />
+
+            {/* --- NEW: Root container to center content --- */}
             <View style={styles.root}>
                 <KeyboardAvoidingView
                     style={styles.container}
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 >
-                    {/* Conditionally render Role Selection or Login Form */}
-                    {roleSelection === null ? renderRoleSelection() : renderLoginForm()}
+                    {/* --- NEW: Back Button --- */}
+                    <TouchableOpacity
+                        style={styles.goBackButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Icon name="arrow-left" type="font-awesome-5" color={LIGHT_COLORS.textSecondary} size={20} />
+                    </TouchableOpacity>
+
+                    <ScrollView
+                        contentContainerStyle={styles.scrollContent}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        {/* --- Logo (Still Commented) --- */}
+                        {/*
+                        <Image
+                            source={require('../assets/logo_placeholder.png')}
+                            style={styles.logo}
+                            resizeMode="contain"
+                        />
+                        */}
+
+                        {/* --- Title & Subtitle --- */}
+                        <Text style={styles.title}>Welcome Back!</Text>
+                        <Text style={styles.subtitle}>Login to your account</Text>
+
+                        {/* --- Input Fields --- */}
+                        <View style={styles.formContainer}>
+                            <TextInput
+                                label="Email Address"
+                                value={email}
+                                onChangeText={(text) => {
+                                    setEmail(text);
+                                    if (errors.email) setErrors({ ...errors, email: '' });
+                                }}
+                                style={styles.input}
+                                mode="filled"
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                error={!!errors.email}
+                                disabled={loading}
+                                accessibilityLabel="Email Address Input"
+                            />
+                            {errors.email ? (
+                                <HelperText type="error" visible={!!errors.email} style={styles.helperText}>
+                                    {errors.email}
+                                </HelperText>
+                            ) : null}
+
+                            <TextInput
+                                label="Password"
+                                value={password}
+                                onChangeText={(text) => {
+                                    setPassword(text);
+                                    if (errors.password) setErrors({ ...errors, password: '' });
+                                }}
+                                secureTextEntry={!showPassword}
+                                style={styles.input}
+                                mode="filled"
+                                right={
+                                    <TextInput.Icon
+                                        icon={showPassword ? "eye-off" : "eye"}
+                                        color={LIGHT_COLORS.textSecondary}
+                                        onPress={() => setShowPassword(!showPassword)}
+                                    />
+                                }
+                                error={!!errors.password}
+                                disabled={loading}
+                                accessibilityLabel="Password Input"
+                            />
+                            {errors.password ? (
+                                <HelperText type="error" visible={!!errors.password} style={styles.helperText}>
+                                    {errors.password}
+                                </HelperText>
+                            ) : null}
+
+                            {/* --- Forgot Password --- */}
+                            <TouchableOpacity
+                                onPress={() => Alert.alert('Forgot Password', 'Password reset flow not implemented.')}
+                                style={styles.forgotContainer}
+                            >
+                                <Text style={styles.forgotLink}>Forgot Password?</Text>
+                            </TouchableOpacity>
+
+                            {/* --- Login Button --- */}
+                            <Button
+                                mode="contained"
+                                onPress={handleLogin}
+                                style={styles.button}
+                                labelStyle={styles.buttonLabel}
+                                loading={loading}
+                                disabled={loading}
+                                accessibilityLabel="Login Button"
+                            >
+                                {loading ? 'Logging in...' : 'Login'}
+                            </Button>
+
+                            {/* --- Social Login Prompt --- */}
+                            <Text style={styles.socialPrompt}>Or login with</Text>
+
+                            {/* --- Social Icons --- */}
+                            <View style={styles.socialRow}>
+                                <TouchableOpacity style={styles.socialButton} accessibilityLabel="Login with Google">
+                                    <Icon name="google" type="font-awesome-5" color={LIGHT_COLORS.google} size={22} />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.socialButton} accessibilityLabel="Login with Facebook">
+                                    <Icon name="facebook-f" type="font-awesome-5" color={LIGHT_COLORS.facebook} size={22} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* --- Sign Up Link --- */}
+                            <View style={styles.footerContainer}>
+                                <Text style={styles.footerText}>Don't have an account? </Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('Signup')} disabled={loading}>
+                                    <Text style={styles.footerLink}>Signup</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </ScrollView>
                 </KeyboardAvoidingView>
             </View>
         </PaperProvider>
     );
 };
 
-// Styles (includes new styles for role selection)
+// --- Styles ---
 const styles = StyleSheet.create({
+    // NEW: Root style to center the container
     root: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: LIGHT_COLORS.background,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    // UPDATED: Container now has a max width
     container: {
+        flex: 1,
         width: '100%',
-        maxWidth: 450,
-        height: '100%',
-        justifyContent: 'center', // Center content vertically for role selection
+        maxWidth: 450, // This centers the content on larger screens (web/tablet)
+        backgroundColor: LIGHT_COLORS.background,
     },
+    // NEW: Back button style
+    goBackButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 60 : 40, // Adjust for status bar
+        left: 20,
+        zIndex: 10, // Ensure it's on top of other content
+        padding: 10, // Makes it easier to tap
+    },
+    // UPDATED: Scroll content needs padding at the top
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
         padding: 30,
+        paddingTop: 80, // Adds space so content doesn't start under the back button
     },
-    // --- Role Selection Styles ---
-    roleSelectionContainer: {
-        padding: 30,
-        alignItems: 'center', // Center items horizontally
-    },
-    roleTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginBottom: 40,
-        textAlign: 'center',
-    },
-    roleButton: {
-        backgroundColor: COLORS.inputBackground,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.inputBorder,
-        paddingVertical: 30,
-        paddingHorizontal: 20,
-        width: '100%',
-        alignItems: 'center',
+    logo: {
+        width: 80,
+        height: 80,
+        alignSelf: 'center',
         marginBottom: 20,
     },
-    roleButtonText: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginTop: 15,
-    },
-    roleButtonSubtitle: {
-        fontSize: 14,
-        color: COLORS.textSecondary,
-        marginTop: 4,
-    },
-    footerContainerAlt: { // Style for signup link in role selection
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 40, // More space after buttons
-    },
-    // --- Login Form Styles ---
-    goBackButton: {
-        position: 'absolute',
-        top: Platform.OS === 'ios' ? 60 : 40, // Adjust top position
-        left: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 10,
-        zIndex: 1, // Ensure it's tappable
-    },
-    goBackText: {
-        color: COLORS.textSecondary,
-        fontSize: 14,
-        marginLeft: 8,
-    },
     title: {
-        fontSize: 34,
+        fontSize: 28,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: LIGHT_COLORS.text,
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    subtitle: {
+        fontSize: 16,
+        color: LIGHT_COLORS.textSecondary,
+        textAlign: 'center',
         marginBottom: 30,
-        marginTop: 60, // Add margin to push title down from potential status bar overlap
-        alignSelf: 'flex-start',
     },
     formContainer: {
         width: '100%',
     },
     input: {
-        backgroundColor: COLORS.inputBackground,
+        backgroundColor: LIGHT_COLORS.inputBackground,
         marginBottom: 10,
     },
     helperText: {
         marginBottom: 10,
         marginTop: -10,
+        paddingHorizontal: 5,
     },
-    optionsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    forgotContainer: {
+        alignSelf: 'flex-end',
         marginBottom: 20,
-    },
-    checkboxContainer: {
-        padding: 0,
-        marginLeft: -12,
-    },
-    checkboxLabel: {
-        color: COLORS.textSecondary,
-        fontSize: 14,
     },
     forgotLink: {
         fontSize: 14,
-        color: COLORS.primary,
-        fontWeight: 'bold',
+        color: LIGHT_COLORS.primary,
     },
     button: {
-        backgroundColor: COLORS.primary,
-        borderRadius: 12,
+        backgroundColor: LIGHT_COLORS.primary,
+        borderRadius: 10,
         paddingVertical: 8,
+        marginTop: 10,
     },
     buttonLabel: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
+        color: LIGHT_COLORS.white,
     },
-    dividerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 30,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: COLORS.textSecondary,
-    },
-    dividerText: {
-        marginHorizontal: 10,
-        color: COLORS.textSecondary,
+    socialPrompt: {
         fontSize: 14,
+        color: LIGHT_COLORS.textSecondary,
+        textAlign: 'center',
+        marginVertical: 30,
     },
     socialRow: {
         flexDirection: 'row',
@@ -422,12 +328,17 @@ const styles = StyleSheet.create({
     socialButton: {
         width: 50,
         height: 50,
-        borderRadius: 12,
-        backgroundColor: COLORS.inputBackground,
+        borderRadius: 25, // Circular
+        backgroundColor: LIGHT_COLORS.white,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: COLORS.inputBorder,
+        borderColor: LIGHT_COLORS.inputBorder,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
     },
     footerContainer: {
         flexDirection: 'row',
@@ -437,14 +348,13 @@ const styles = StyleSheet.create({
     },
     footerText: {
         fontSize: 16,
-        color: COLORS.textSecondary,
+        color: LIGHT_COLORS.textSecondary,
     },
     footerLink: {
         fontSize: 16,
-        color: COLORS.primary,
+        color: LIGHT_COLORS.primary,
         fontWeight: 'bold',
     },
 });
 
 export default LoginScreen;
-

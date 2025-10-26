@@ -8,7 +8,7 @@ import {
     Image,
     Alert,
     Platform,
-    FlatList // Added FlatList
+    FlatList
 } from 'react-native';
 import {
     Card,
@@ -21,15 +21,15 @@ import {
     Searchbar,
     Divider,
     ActivityIndicator,
-    Avatar // Added Avatar for leaderboard list
+    Avatar
 } from 'react-native-paper';
 import { Icon } from 'react-native-elements';
 import { db, auth } from '../firebaseConfig';
-// Updated imports for querying users
+// Using the necessary Firebase imports
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
-// Color Palette (same as previous dashboard screens)
+// --- Customized Color Palette ---
 const COLORS = {
     background: '#F8FAFC',
     cardBackground: '#FFFFFF',
@@ -40,13 +40,16 @@ const COLORS = {
     border: '#E2E8F0',
     iconBg: '#F1F5F9',
     star: '#FBBF24', // Yellow star color
-    online: '#10B981', // Green online indicator (Might use for top ranks?)
     gold: '#FBBF24',
     silver: '#94A3B8',
-    bronze: '#F59E0B', // Using primary orange as bronze substitute
+    bronze: '#F59E0B',
+    darkText: '#0F172A',
+    lightGray: '#F1F5F9',
+    primaryBlue: '#3B82F6',
+    blackBadge: '#0F172A',
 };
 
-// Theme (same as previous dashboard screens)
+// Theme (retained)
 const theme = {
     ...DefaultTheme,
     roundness: 8,
@@ -63,7 +66,7 @@ const theme = {
     },
 };
 
-// --- Sidebar Navigation Item Component --- (same as before)
+// --- Sidebar Navigation Item Component (retained) ---
 const SidebarNavItem = ({ icon, label, active, onPress }) => (
     <TouchableOpacity
         style={[styles.sidebarNavItem, active && styles.sidebarNavItemActive]}
@@ -74,28 +77,109 @@ const SidebarNavItem = ({ icon, label, active, onPress }) => (
     </TouchableOpacity>
 );
 
-// --- *** NEW: LeaderboardScreen Component *** ---
+/**
+ * Render Worker Card - Mobile list view with R currency.
+ */
+const renderWorkerCard = ({ item, index }) => {
+    // Determine the rank display: use '#' for top 2
+    const rank = index + 1;
+    const rankDisplay = rank <= 2 ? `#${rank}` : `${rank}`;
+    let rankBadgeStyle = rank === 1 || rank === 2 ? styles.rankBadgeGold : styles.rankBadgeNormal;
+
+    // Fallback/Formatted data
+    const workerName = item.name || 'Unnamed Worker';
+    const workerReputation = (item.reputation || 0).toFixed(1);
+    const workerJobsCompleted = item.jobsCompleted || 0;
+    const workerPrice = item.price || `R${(Math.floor(Math.random() * 500) + 300)}/hr`; // Placeholder for price
+    const workerDescription = item.description || 'Skilled Worker Profile'; // Placeholder for description
+    const isTopRated = workerReputation >= 4.5;
+    const avatarInitial = workerName.charAt(0).toUpperCase();
+
+    return (
+        <Card style={styles.workerCardMobile}>
+            <Card.Content style={styles.workerCardContentMobile}>
+
+                {/* Top Section: Rank and Price Badge */}
+                <View style={styles.workerGridHeader}>
+                    <View style={[styles.rankBadge, rankBadgeStyle]}>
+                        <Text style={[styles.rankBadgeText, rank > 2 && {color: COLORS.text}]}>{rankDisplay}</Text>
+                    </View>
+                    <View style={styles.priceBadge}>
+                        <Text style={styles.priceBadgeText}>{workerPrice}</Text> {/* Using R for Rand */}
+                    </View>
+                </View>
+
+                {/* Avatar and Name */}
+                <View style={styles.workerGridProfile}>
+                    <View style={[styles.avatarPlaceholder, styles.workerGridAvatar]}>
+                        {item.avatarUrl ? (
+                            <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+                        ) : (
+                            <Text style={[styles.avatarInitialLarge, { color: COLORS.darkText }]}>{avatarInitial}</Text>
+                        )}
+                    </View>
+                    <Text style={styles.workerGridName}>{workerName}</Text>
+                    <Text style={styles.workerGridDescription}>{workerDescription}</Text>
+                </View>
+
+                {/* Footer Section: Stats and Top Rated Badge */}
+                <View style={styles.workerGridFooterMobile}>
+                    <View style={styles.workerGridStatRow}>
+                        <Icon name="star" type="font-awesome-5" solid color={COLORS.star} size={14} style={{marginRight: 6}}/>
+                        <Text style={styles.workerGridStatText}>{workerReputation} Reputation</Text>
+                    </View>
+                    <View style={styles.workerGridStatRow}>
+                        <Icon name="briefcase" type="font-awesome-5" color={COLORS.textSecondary} size={14} style={{marginRight: 6}}/>
+                        <Text style={styles.workerGridStatText}>{workerJobsCompleted} Jobs Completed</Text>
+                    </View>
+                    {isTopRated && (
+                        <View style={styles.topRatedBadge}>
+                            <Icon name="medal" type="font-awesome-5" size={12} color={COLORS.gold}/>
+                            <Text style={styles.topRatedText}>Top Rated</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* View Profile Button */}
+                <Button
+                    mode="contained"
+                    style={styles.viewProfileButtonGrid}
+                    labelStyle={styles.viewProfileButtonLabelGrid}
+                    onPress={() => { /* navigation.navigate('WorkerProfile', { workerId: item.id }) */ }}
+                >
+                    View Profile
+                </Button>
+
+            </Card.Content>
+        </Card>
+    );
+};
+
+
+// --- LeaderboardScreen Component ---
 const LeaderboardScreen = ({ navigation }) => {
     // --- State ---
-    const [activeScreen, setActiveScreen] = useState('Leaderboard'); // Set initial active screen
+    const [activeScreen, setActiveScreen] = useState('Leaderboard');
     const [currentUser, setCurrentUser] = useState({ name: 'Loading...', email: '', avatarInitial: '', uid: null, role: '' });
-    const [workers, setWorkers] = useState([]); // State for leaderboard workers
+    const [workers, setWorkers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState('Reputation');
 
-    // --- Fetch User Data and Leaderboard Data Effect ---
+    // --- Fetch User Data and Leaderboard Data Effect (UPDATED FOR FIREBASE) ---
     useEffect(() => {
         setLoading(true);
         const currentUserUid = auth.currentUser?.uid;
 
         if (!currentUserUid) {
-            navigation.navigate('Login');
+            // navigation.navigate('Login'); // Use this in production
             setLoading(false);
             return;
         }
 
         const fetchData = async () => {
             try {
-                // Fetch current user's basic info for sidebar
+                // 1. Fetch current user's basic info for sidebar
                 const userRef = doc(db, "users", currentUserUid);
                 const userSnap = await getDoc(userRef);
                 if (userSnap.exists()) {
@@ -112,15 +196,19 @@ const LeaderboardScreen = ({ navigation }) => {
                     setCurrentUser({ uid: currentUserUid, name: 'User', email: '', avatarInitial: 'U', role: '' });
                 }
 
-                // Fetch workers for leaderboard, ordered by reputation
+                // 2. Fetch workers for leaderboard, ordered by reputation (or the active tab criteria)
                 const workersRef = collection(db, "users");
-                // Query where role is 'worker', order by 'reputation' descending, limit to top e.g., 50
+
+                // Determine the field to order by based on the activeTab state
+                const orderByField = activeTab === 'Reputation' ? 'reputation' : 'jobsCompleted';
+
                 const q = query(
                     workersRef,
                     where("role", "==", "worker"),
-                    orderBy("reputation", "desc"), // Order by reputation score
-                    limit(50) // Limit the number of workers shown
+                    orderBy(orderByField, "desc"), // Order by 'reputation' or 'jobsCompleted'
+                    limit(50)
                 );
+
                 const querySnapshot = await getDocs(q);
                 const workersList = querySnapshot.docs.map(doc => ({
                     id: doc.id,
@@ -129,7 +217,11 @@ const LeaderboardScreen = ({ navigation }) => {
                     reputation: doc.data().reputation || 0,
                     jobsCompleted: doc.data().jobsCompleted || 0,
                     name: doc.data().name || 'Unnamed Worker',
+                    description: doc.data().skill || doc.data().bio || 'Skilled Worker', // Use skill/bio from DB if available
+                    price: doc.data().rate ? `R${doc.data().rate}/hr` : `R${(Math.floor(Math.random() * 500) + 300)}/hr`, // Use rate from DB, or placeholder
+                    avatarUrl: doc.data().avatarUrl || null,
                 }));
+
                 setWorkers(workersList);
 
             } catch (error) {
@@ -144,17 +236,17 @@ const LeaderboardScreen = ({ navigation }) => {
             if (user && user.uid === currentUserUid) {
                 fetchData();
             } else if (!user) {
-                navigation.navigate('Login');
+                // navigation.navigate('Login'); // Use this in production
             }
         });
 
-        fetchData(); // Initial fetch
+        fetchData();
 
-        return () => unsubscribe(); // Cleanup listener
+        return () => unsubscribe();
 
-    }, [navigation]);
+    }, [navigation, activeTab]); // Re-run effect when activeTab changes
 
-    // --- Navigation Handlers --- (same as before)
+    // --- Navigation Handlers (retained) ---
     const handleSidebarNav = (screenName) => {
         if (screenName === activeScreen) return;
         let targetScreen = 'Home';
@@ -162,8 +254,8 @@ const LeaderboardScreen = ({ navigation }) => {
         else if (screenName === 'Post Job') targetScreen = 'PostJob';
         else if (screenName === 'Home') targetScreen = 'Home';
         else if (screenName === 'Profile') targetScreen = 'Profile';
-        else if (screenName === 'Wallet') targetScreen = 'Wallet'; // Added Wallet navigation
-        else if (screenName === 'Leaderboard') return; // Already here
+        else if (screenName === 'Wallet') targetScreen = 'Wallet';
+        else if (screenName === 'Leaderboard') return;
 
         setActiveScreen(screenName);
         navigation.navigate(targetScreen);
@@ -173,69 +265,24 @@ const LeaderboardScreen = ({ navigation }) => {
         try { await signOut(auth); } catch (error) { Alert.alert('Error', 'Could not sign out.'); }
     };
 
-    // --- Render Leaderboard Item ---
-    const renderWorkerItem = ({ item, index }) => {
-        const rank = index + 1;
-        let rankColor = COLORS.textSecondary;
-        let rankIcon = null;
-        if (rank === 1) { rankColor = COLORS.gold; rankIcon = 'trophy'; }
-        else if (rank === 2) { rankColor = COLORS.silver; rankIcon = 'medal'; }
-        else if (rank === 3) { rankColor = COLORS.bronze; rankIcon = 'award';}
+    // Filter Workers based on search query (sorting is now handled in the useEffect by Firebase)
+    const filteredWorkers = workers.filter(worker =>
+        worker.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (worker.description && worker.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
 
-        const avatarLabel = item.name ? item.name.charAt(0).toUpperCase() : '?';
-        const avatarUrl = item.avatarUrl || null; // Assuming you store avatarUrl
-
-        return (
-            <Card style={styles.workerCard}>
-                <Card.Content style={styles.workerCardContent}>
-                    {/* Rank */}
-                    <View style={styles.rankContainer}>
-                        {rankIcon ? (
-                            <Icon name={rankIcon} type="font-awesome-5" size={20} color={rankColor} />
-                        ) : (
-                            <Text style={[styles.rankNumber, { color: rankColor }]}>{rank}</Text>
-                        )}
-                    </View>
-
-                    {/* Avatar */}
-                    <View style={[styles.avatarPlaceholder, styles.listAvatar]}>
-                        {avatarUrl ? (
-                            <Image source={{ uri: avatarUrl }} style={styles.avatarImageSmall} />
-                        ) : (
-                            <Text style={[styles.avatarInitialSmall, { color: COLORS.primary }]}>{avatarLabel}</Text>
-                        )}
-                    </View>
-
-                    {/* Worker Info */}
-                    <View style={styles.workerInfo}>
-                        <Text style={styles.workerName}>{item.name}</Text>
-                        <View style={styles.workerStats}>
-                            <Icon name="star" type="font-awesome-5" solid color={COLORS.star} size={12} style={{marginRight: 4}}/>
-                            <Text style={styles.workerStatText}>{item.reputation.toFixed(1)} Reputation</Text>
-                            <Text style={styles.statSeparator}>•</Text>
-                            <Icon name="check-circle" type="font-awesome-5" color={COLORS.textSecondary} size={12} style={{marginRight: 4}}/>
-                            <Text style={styles.workerStatText}>{item.jobsCompleted} Jobs</Text>
-                        </View>
-                    </View>
-
-                    {/* View Profile Button */}
-                    <Button
-                        mode="outlined" // Use outlined for secondary action
-                        style={styles.viewProfileButton}
-                        labelStyle={styles.viewProfileButtonLabel}
-                        onPress={() => { /* navigation.navigate('WorkerProfile', { workerId: item.id }) */ }}
-                    >
-                        View
-                    </Button>
-                </Card.Content>
-            </Card>
-        );
+    // Handle tab change and re-fetch data
+    const handleTabChange = (tabName) => {
+        setWorkers([]); // Clear current workers while fetching
+        setLoading(true);
+        setActiveTab(tabName);
+        // The useEffect dependency array will trigger fetchData() automatically
     };
 
     return (
         <PaperProvider theme={theme}>
             <View style={styles.root}>
-                {/* --- Sidebar --- */}
+                {/* --- Sidebar (Kept) --- */}
                 <View style={styles.sidebar}>
                     <View style={styles.sidebarHeader}>
                         <View style={[styles.sidebarLogoBg, { backgroundColor: COLORS.primaryLight }]}>
@@ -277,9 +324,10 @@ const LeaderboardScreen = ({ navigation }) => {
                     </View>
                 </View>
 
-                {/* --- Main Content (Leaderboard) --- */}
+                {/* --- Main Content (Mobile-style Header and Content) --- */}
                 <ScrollView style={styles.mainContent}>
-                    {/* Header */}
+
+                    {/* Header: App Header (No desktop bar) */}
                     <View style={styles.mainHeader}>
                         <Title style={styles.mainTitle}>Worker Leaderboard</Title>
                         <View style={styles.headerActions}>
@@ -289,28 +337,55 @@ const LeaderboardScreen = ({ navigation }) => {
                         </View>
                     </View>
 
-                    {/* Leaderboard Content */}
-                    <View style={styles.leaderboardGrid}>
+                    {/* Leaderboard Main Area */}
+                    <View style={styles.leaderboardMainAreaMobile}>
+
                         <Subheading style={styles.leaderboardSubtitle}>Top workers based on reputation score</Subheading>
+
+                        <Searchbar
+                            placeholder="Search for workers..."
+                            onChangeText={setSearchQuery}
+                            value={searchQuery}
+                            style={styles.searchbarMobile}
+                            inputStyle={styles.searchbarInput}
+                            iconColor={COLORS.textSecondary}
+                        />
+
+                        {/* Filter Tabs */}
+                        <View style={styles.filterTabs}>
+                            <TouchableOpacity
+                                style={activeTab === 'Reputation' ? styles.filterTabActive : styles.filterTab}
+                                onPress={() => handleTabChange('Reputation')}
+                            >
+                                <Text style={activeTab === 'Reputation' ? styles.filterTabTextActive : styles.filterTabText}>Reputation</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={activeTab === 'Jobs Completed' ? styles.filterTabActive : styles.filterTab}
+                                onPress={() => handleTabChange('Jobs Completed')}
+                            >
+                                <Text style={activeTab === 'Jobs Completed' ? styles.filterTabTextActive : styles.filterTabText}>Jobs Completed</Text>
+                            </TouchableOpacity>
+                        </View>
+
 
                         {loading ? (
                             <View style={styles.loadingContainer}>
                                 <ActivityIndicator animating={true} color={COLORS.primary} size="large"/>
                                 <Paragraph style={{ marginTop: 10, color: COLORS.textSecondary }}>Loading leaderboard...</Paragraph>
                             </View>
-                        ) : workers.length > 0 ? (
+                        ) : filteredWorkers.length > 0 ? (
                             <FlatList
-                                data={workers}
+                                data={filteredWorkers}
                                 keyExtractor={item => item.id}
-                                renderItem={renderWorkerItem}
-                                // nestedScrollEnabled // May not be needed
-                                contentContainerStyle={{ paddingBottom: 20 }} // Add padding at bottom
+                                renderItem={renderWorkerCard}
+                                scrollEnabled={false}
+                                contentContainerStyle={{ paddingBottom: 20 }}
                             />
                         ) : (
                             <View style={styles.emptyStateCard}>
                                 <Icon name="users-slash" type="font-awesome-5" color={COLORS.textSecondary} size={40}/>
                                 <Text style={styles.emptyStateTitle}>No Workers Found</Text>
-                                <Text style={styles.emptyStateText}>Worker rankings will appear here once data is available.</Text>
+                                <Text style={styles.emptyStateText}>No workers match your current filters or search query.</Text>
                             </View>
                         )}
                     </View>
@@ -320,17 +395,17 @@ const LeaderboardScreen = ({ navigation }) => {
     );
 };
 
-// --- Styles ---
+// --- Styles (Retained Mobile Layout + Card Design) ---
 const styles = StyleSheet.create({
     root: {
         flex: 1,
         flexDirection: 'row',
-        backgroundColor: COLORS.background,
+        backgroundColor: COLORS.cardBackground,
     },
-    // Sidebar Styles (copied)
+    // --- Sidebar Styles (Retained) ---
     sidebar: { width: 260, backgroundColor: COLORS.cardBackground, borderRightWidth: 1, borderRightColor: COLORS.border, padding: 20, justifyContent: 'space-between' },
     sidebarHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 40, paddingLeft: 10 },
-    sidebarLogoBg: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    sidebarLogoBg: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 12, backgroundColor: COLORS.primaryLight },
     sidebarTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.text },
     sidebarSubtitle: { fontSize: 12, color: COLORS.textSecondary },
     sidebarNav: { flex: 1, marginTop: 20 },
@@ -342,128 +417,204 @@ const styles = StyleSheet.create({
     sidebarFooter: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 20 },
     userInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
     userAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12, backgroundColor: COLORS.primaryLight, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-    avatarImage: { width: '100%', height: '100%' },
+    avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     userName: { fontSize: 14, fontWeight: '600', color: COLORS.text, maxWidth: 150 },
     userEmail: { fontSize: 12, color: COLORS.textSecondary, maxWidth: 150 },
     signOutButton: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16 },
     signOutText: { fontSize: 15, color: COLORS.textSecondary, fontWeight: '500', marginLeft: 12 + 25 },
 
-    // Main Content Styles
+    // --- Main Content Styles (Mobile) ---
     mainContent: { flex: 1, backgroundColor: COLORS.background },
-    mainHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 30, backgroundColor: COLORS.cardBackground, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+
+    // Header (App Header)
+    mainHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: COLORS.cardBackground, borderBottomWidth: 1, borderBottomColor: COLORS.border },
     mainTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     actionIcon: { padding: 8 },
 
-    // Leaderboard Specific Styles
-    leaderboardGrid: { padding: 30 },
+    leaderboardMainAreaMobile: {
+        padding: 20,
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
     leaderboardSubtitle: {
         fontSize: 16,
         color: COLORS.textSecondary,
-        marginBottom: 24,
+        marginBottom: 15,
     },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 50 },
-    workerCard: {
+    searchbarMobile: {
+        marginBottom: 20,
         backgroundColor: COLORS.cardBackground,
         borderRadius: 8,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        marginBottom: 12,
         elevation: 1,
+        height: 48,
     },
-    workerCardContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-    },
-    rankContainer: {
-        width: 40, // Fixed width for rank/icon
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    rankNumber: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    listAvatar: { // Use avatarPlaceholder styles but make slightly smaller
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        marginRight: 16,
-        backgroundColor: COLORS.primaryLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    avatarImageSmall: { // Specific style if using image in list
-        width: '100%',
-        height: '100%',
-    },
-    avatarInitialSmall: { // Specific style for initial in list
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    workerInfo: {
-        flex: 1, // Take remaining space
-        marginRight: 16,
-    },
-    workerName: {
-        fontSize: 16,
-        fontWeight: '600',
+    searchbarInput: {
+        fontSize: 15,
         color: COLORS.text,
-        marginBottom: 4,
     },
-    workerStats: {
+
+    // Filter Tabs
+    filterTabs: {
         flexDirection: 'row',
-        alignItems: 'center',
+        marginBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
-    workerStatText: {
-        fontSize: 13,
-        color: COLORS.textSecondary,
-        marginLeft: 2, // Small space after icon
+    filterTab: {
+        paddingBottom: 10,
+        marginRight: 20,
     },
-    statSeparator: {
-        marginHorizontal: 8,
-        color: COLORS.textSecondary,
+    filterTabActive: {
+        paddingBottom: 10,
+        marginRight: 20,
+        borderBottomWidth: 2,
+        borderBottomColor: COLORS.primaryBlue,
     },
-    viewProfileButton: {
-        borderColor: COLORS.border, // Use border color for outlined
-        borderRadius: 6,
-        borderWidth: 1, // Ensure border shows
-    },
-    viewProfileButtonLabel: {
-        fontSize: 13,
+    filterTabText: {
+        fontSize: 14,
         fontWeight: '600',
-        color: COLORS.text, // Use primary text color
-        marginHorizontal: 10,
-        marginVertical: 4,
+        color: COLORS.textSecondary,
     },
-    emptyStateCard: {
+    filterTabTextActive: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: COLORS.primaryBlue,
+    },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 50 },
+
+    // --- Mobile Card Styles (Worker Card Design) ---
+    workerCardMobile: {
+        width: '100%',
         backgroundColor: COLORS.cardBackground,
         borderRadius: 12,
-        padding: 40,
-        alignItems: 'center',
-        marginTop: 40,
         borderWidth: 1,
         borderColor: COLORS.border,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        marginBottom: 15,
+        position: 'relative',
     },
-    emptyStateTitle: {
+    workerCardContentMobile: {
+        padding: 20,
+    },
+    workerGridHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 15,
+    },
+    rankBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 99,
+        alignItems: 'center',
+    },
+    rankBadgeGold: {
+        backgroundColor: COLORS.gold,
+    },
+    rankBadgeNormal: {
+        backgroundColor: COLORS.lightGray,
+    },
+    rankBadgeText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: COLORS.darkText,
+    },
+    priceBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 4,
+        backgroundColor: COLORS.blackBadge,
+    },
+    priceBadgeText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: COLORS.cardBackground,
+    },
+    workerGridProfile: {
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    workerGridAvatar: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        marginBottom: 10,
+        backgroundColor: COLORS.lightGray,
+        overflow: 'hidden',
+    },
+    avatarInitialLarge: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: COLORS.darkText,
+    },
+    workerGridName: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: COLORS.text,
-        marginTop: 16,
-        marginBottom: 8,
+        color: COLORS.darkText,
+        textAlign: 'center',
     },
-    emptyStateText: {
-        fontSize: 14,
+    workerGridDescription: {
+        fontSize: 12,
         color: COLORS.textSecondary,
         textAlign: 'center',
-        marginBottom: 24,
+        marginTop: 4,
+        maxWidth: '90%',
+    },
+    workerGridFooterMobile: {
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        paddingTop: 15,
+        marginBottom: 50,
+    },
+    workerGridStatRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    workerGridStatText: {
+        fontSize: 13,
+        color: COLORS.textSecondary,
+    },
+    topRatedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.primaryLight,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+        marginTop: 10,
+        borderColor: COLORS.gold,
+        borderWidth: 1,
+    },
+    topRatedText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.gold,
+        marginLeft: 6,
+    },
+    viewProfileButtonGrid: {
+        position: 'absolute',
+        bottom: 10,
+        right: 15,
+        backgroundColor: COLORS.primaryBlue,
+        borderRadius: 6,
+        elevation: 2,
+    },
+    viewProfileButtonLabelGrid: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.cardBackground,
+        marginHorizontal: 5,
+        marginVertical: 4,
     },
     // Shared avatar styles
     avatarPlaceholder: { justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
     avatarInitial: { fontWeight: 'bold' },
-
 });
 
 export default LeaderboardScreen;

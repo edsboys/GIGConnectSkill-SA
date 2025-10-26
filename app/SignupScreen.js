@@ -2,82 +2,58 @@ import React, { useState } from 'react';
 import {
     View,
     StyleSheet,
-    // Added imports for new UI
     ScrollView,
     KeyboardAvoidingView,
     Platform,
     Image,
     TouchableOpacity,
     Alert,
-    StatusBar
-} from 'react-native';
-import {
-    TextInput,
-    Button,
-    Title,
-    Subheading,
-    RadioButton, // Kept this import
+    StatusBar,
     Text,
-    // Added imports for new UI
-    Provider as PaperProvider,
-    DefaultTheme,
-    HelperText,
-    Checkbox
-} from 'react-native-paper';
+    TextInput,
+} from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, doc, setDoc } from "firebase/firestore";
-import { Icon } from 'react-native-elements'; // Added
+import { Icon } from 'react-native-elements';
 
-// 1. Define the color palette from refer.jpg
+// 1. Define the color palette from the image
 const COLORS = {
-    background: '#1F1D2B', // Dark purple background
-    primary: '#E91E63', // Bright pink accent
-    text: '#FFFFFF',
-    textSecondary: '#9A9A9A',
-    inputBorder: '#E91E63',
-    inputBackground: '#2D2D3A',
+    background: '#F4F7FC',
+    container: '#FFFFFF',
+    primary: '#5851DB',
+    text: '#333333',
+    label: '#555555',
+    textSecondary: '#888888',
+    inputBg: '#F8F9FA',
+    inputBorder: '#E0E0E0',
+    roleSelectedBg: 'rgba(88, 81, 219, 0.1)',
+    roleSelectedBorder: '#5851DB',
+    error: '#D32F2F',
 };
 
-// 2. Create the dark theme for React Native Paper
-const theme = {
-    ...DefaultTheme,
-    dark: true,
-    colors: {
-        ...DefaultTheme.colors,
-        primary: COLORS.primary,
-        accent: COLORS.primary,
-        background: 'transparent',
-        surface: COLORS.inputBackground,
-        text: COLORS.text,
-        placeholder: COLORS.textSecondary,
-        onSurface: COLORS.text,
-        outline: COLORS.inputBorder,
-    },
-    roundness: 12,
-};
+// 2. Removed the react-native-paper theme
 
 const SignupScreen = ({ navigation }) => {
-    // 3. Adapted state to match the refer.jpg form
-    const [firstName, setFirstName] = useState(''); // Changed from name
-    const [lastName, setLastName] = useState('');   // Added
+    // 3. Adapted state to match the image's form
+    const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState(''); // Added
-    const [role, setRole] = useState('client'); // Kept from original
-    const [agree, setAgree] = useState(false); // Added
-    const [loading, setLoading] = useState(false); // Added
-    const [showPassword, setShowPassword] = useState(false); // Added
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false); // Added
-    const [errors, setErrors] = useState({ name: '', email: '', password: '', confirm: '', agree: '' }); // Updated errors state
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [role, setRole] = useState('client');
+    const [agree, setAgree] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [errors, setErrors] = useState({ fullName: '', email: '', password: '', confirm: '', agree: '' });
 
-    // 4. Validation logic updated for new fields
+    // 4. Validation logic updated for new 'fullName' field
     const validateInputs = () => {
         let valid = true;
-        const newErrors = { name: '', email: '', password: '', confirm: '', agree: '' };
+        const newErrors = { fullName: '', email: '', password: '', confirm: '', agree: '' };
 
-        if (!firstName.trim() || !lastName.trim()) {
-            newErrors.name = 'First and Last name are required';
+        if (!fullName.trim()) {
+            newErrors.fullName = 'Full name is required';
             valid = false;
         }
 
@@ -103,7 +79,7 @@ const SignupScreen = ({ navigation }) => {
         }
 
         if (!agree) {
-            newErrors.agree = 'You must agree to the terms';
+            newErrors.agree = 'You must agree to the terms and conditions';
             valid = false;
         }
 
@@ -111,319 +87,411 @@ const SignupScreen = ({ navigation }) => {
         return valid;
     };
 
-
-    // --- Your exact handleSignup function (updated for new fields) ---
+    // 5. Updated handleSignup to use 'fullName'
     const handleSignup = () => {
-        if (!validateInputs()) return; // Use new validation
+        if (!validateInputs()) return;
 
-        setLoading(true); // Set loading state
-        createUserWithEmailAndPassword(auth, email.trim(), password) // Trim email
+        setLoading(true);
+        createUserWithEmailAndPassword(auth, email.trim(), password)
             .then(async (userCredential) => {
                 const user = userCredential.user;
-                // Add user to Firestore using combined first/last name
                 await setDoc(doc(db, "users", user.uid), {
                     uid: user.uid,
-                    name: `${firstName.trim()} ${lastName.trim()}`, // Use combined name
-                    email: email.trim(), // Use trimmed email
+                    name: fullName.trim(),
+                    email: email.trim(),
                     role: role,
                     walletBalance: role === 'client' ? 1000 : 0,
-                    ...(role === 'worker' && { skills: [], reputation: 0, jobsCompleted: 0 }) // Updated worker fields
+                    ...(role === 'worker' && { skills: [], reputation: 0, jobsCompleted: 0 })
                 });
-                // Navigation should be handled by your auth state listener in AppNavigator/App.js
-                // setLoading(false); // Usually not needed if navigating away
             })
             .catch((error) => {
-                setLoading(false); // Stop loading on error
+                setLoading(false);
                 const errorCode = error.code;
                 const errorMessage = error.message;
 
                 if (errorCode === 'auth/email-already-in-use') {
                     setErrors({ ...errors, email: 'This email is already registered.' });
                 } else {
-                    Alert.alert('Signup Error', errorMessage); // Show other errors
+                    Alert.alert('Signup Error', errorMessage);
                 }
             });
     };
 
-    // --- New JSX styled like refer.jpg ---
+    // --- New JSX styled like the image ---
     return (
-        <PaperProvider theme={theme}>
-            <StatusBar barStyle="light-content" />
-            <View style={styles.root}>
-                <KeyboardAvoidingView
-                    style={styles.container}
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <View style={styles.root}>
+            <StatusBar barStyle="dark-content" />
+            <KeyboardAvoidingView
+                style={styles.keyboardView}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                 >
-                    <ScrollView
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        <Title style={styles.title}>Sign Up</Title>
+                    <View style={styles.container}>
+                        <View style={styles.logoPlaceholder}>
+                            <Icon name="infinite" type="ionicon" color={COLORS.primary} size={30} />
+                        </View>
 
-                        {/* Form Inputs */}
+                        <Text style={styles.title}>Join Our Community!</Text>
+
                         <View style={styles.formContainer}>
-                            {/* First/Last Name Row */}
-                            <View style={styles.row}>
+                            {/* Full Name */}
+                            <View style={styles.inputRow}>
+                                <Text style={styles.label}>Full Name</Text>
                                 <TextInput
-                                    label="First Name"
-                                    value={firstName}
+                                    // --- STYLE RENAMED ---
+                                    style={styles.inputRowField}
+                                    placeholder="Guest"
+                                    placeholderTextColor={COLORS.textSecondary}
+                                    value={fullName}
                                     onChangeText={(text) => {
-                                        setFirstName(text);
-                                        if (errors.name) setErrors({ ...errors, name: '' });
+                                        setFullName(text);
+                                        if (errors.fullName) setErrors({ ...errors, fullName: '' });
                                     }}
-                                    style={styles.inputHalf}
-                                    mode="outlined"
-                                    error={!!errors.name}
-                                    disabled={loading}
-                                />
-                                <TextInput
-                                    label="Last Name"
-                                    value={lastName}
-                                    onChangeText={(text) => {
-                                        setLastName(text);
-                                        if (errors.name) setErrors({ ...errors, name: '' });
-                                    }}
-                                    style={styles.inputHalf}
-                                    mode="outlined"
-                                    error={!!errors.name}
-                                    disabled={loading}
+                                    editable={!loading}
                                 />
                             </View>
-                            <HelperText type="error" visible={!!errors.name} style={styles.helperText}>
-                                {errors.name}
-                            </HelperText>
+                            {errors.fullName ? <Text style={styles.errorText}>{errors.fullName}</Text> : null}
 
-                            <TextInput
-                                label="Email Address"
-                                value={email}
-                                onChangeText={(text) => {
-                                    setEmail(text);
-                                    if (errors.email) setErrors({ ...errors, email: '' });
-                                }}
-                                style={styles.input}
-                                autoCapitalize="none"
-                                keyboardType="email-address"
-                                mode="outlined"
-                                left={<TextInput.Icon icon="email" color={COLORS.textSecondary} />}
-                                error={!!errors.email}
-                                disabled={loading}
-                            />
-                            <HelperText type="error" visible={!!errors.email} style={styles.helperText}>
-                                {errors.email}
-                            </HelperText>
+                            {/* Email Address */}
+                            <View style={styles.inputRow}>
+                                <Text style={styles.label}>Email Address</Text>
+                                <TextInput
+                                    // --- STYLE RENAMED ---
+                                    style={styles.inputRowField}
+                                    placeholder="you@example.com"
+                                    placeholderTextColor={COLORS.textSecondary}
+                                    value={email}
+                                    onChangeText={(text) => {
+                                        setEmail(text);
+                                        if (errors.email) setErrors({ ...errors, email: '' });
+                                    }}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    editable={!loading}
+                                />
+                            </View>
+                            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
 
-                            <TextInput
-                                label="Password"
-                                value={password}
-                                onChangeText={(text) => {
-                                    setPassword(text);
-                                    if (errors.password) setErrors({ ...errors, password: '' });
-                                }}
-                                secureTextEntry={!showPassword}
-                                style={styles.input}
-                                mode="outlined"
-                                left={<TextInput.Icon icon="lock" color={COLORS.textSecondary} />}
-                                right={
-                                    <TextInput.Icon
-                                        icon="eye"
-                                        color={COLORS.textSecondary}
-                                        onPress={() => setShowPassword(!showPassword)}
+                            {/* Password Fields Row */}
+                            <View style={styles.row}>
+                                {/* Password */}
+                                <View style={[styles.inputContainer, styles.inputHalf]}>
+                                    <Text style={styles.label}>Password</Text>
+                                    <TextInput
+                                        // --- STYLE RENAMED ---
+                                        style={styles.inputField}
+                                        placeholder="••••••••"
+                                        placeholderTextColor={COLORS.textSecondary}
+                                        secureTextEntry={!showPassword}
+                                        value={password}
+                                        onChangeText={(text) => {
+                                            setPassword(text);
+                                            if (errors.password) setErrors({ ...errors, password: '' });
+                                        }}
+                                        editable={!loading}
                                     />
-                                }
-                                error={!!errors.password}
-                                disabled={loading}
-                            />
-                            <HelperText type="error" visible={!!errors.password} style={styles.helperText}>
-                                {errors.password}
-                            </HelperText>
-
-                            <TextInput
-                                label="Confirm Password"
-                                value={confirmPassword}
-                                onChangeText={(text) => {
-                                    setConfirmPassword(text);
-                                    if (errors.confirm) setErrors({ ...errors, confirm: '' });
-                                }}
-                                secureTextEntry={!showConfirmPassword}
-                                style={styles.input}
-                                mode="outlined"
-                                left={<TextInput.Icon icon="lock-check" color={COLORS.textSecondary} />}
-                                right={
-                                    <TextInput.Icon
-                                        icon="eye"
-                                        color={COLORS.textSecondary}
-                                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    />
-                                }
-                                error={!!errors.confirm}
-                                disabled={loading}
-                            />
-                            <HelperText type="error" visible={!!errors.confirm} style={styles.helperText}>
-                                {errors.confirm}
-                            </HelperText>
-
-                            {/* Role Selector (Kept from your logic, simple style) */}
-                            <Text style={styles.radioLabel}>I am a:</Text>
-                            <RadioButton.Group onValueChange={newValue => setRole(newValue)} value={role}>
-                                <View style={styles.radioContainer}>
-                                    <View style={styles.radioButton}>
-                                        <RadioButton value="client" color={COLORS.primary}/>
-                                        <Text style={styles.radioText}>Client (I want to hire)</Text>
-                                    </View>
-                                    <View style={styles.radioButton}>
-                                        <RadioButton value="worker" color={COLORS.primary}/>
-                                        <Text style={styles.radioText}>Worker (Looking for work)</Text>
-                                    </View>
                                 </View>
-                            </RadioButton.Group>
+
+                                {/* Confirm Password */}
+                                <View style={[styles.inputContainer, styles.inputHalf]}>
+                                    <Text style={styles.label}>Confirm Password</Text>
+                                    <TextInput
+                                        // --- STYLE RENAMED ---
+                                        style={styles.inputField}
+                                        placeholder="••••••••"
+                                        placeholderTextColor={COLORS.textSecondary}
+                                        secureTextEntry={!showConfirmPassword}
+                                        value={confirmPassword}
+                                        onChangeText={(text) => {
+                                            setConfirmPassword(text);
+                                            if (errors.confirm) setErrors({ ...errors, confirm: '' });
+                                        }}
+                                        editable={!loading}
+                                    />
+                                </View>
+                            </View>
+                            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+                            {errors.confirm ? <Text style={styles.errorText}>{errors.confirm}</Text> : null}
+
+
+                            {/* Role Selector */}
+                            <Text style={styles.roleTitle}>Select Your Role</Text>
+                            <View style={styles.roleContainer}>
+                                <TouchableOpacity
+                                    style={[styles.roleBox, role === 'client' && styles.roleBoxSelected]}
+                                    onPress={() => setRole('client')}
+                                    disabled={loading}
+                                >
+                                    <Icon
+                                        name="briefcase"
+                                        type="font-awesome-5"
+                                        color={role === 'client' ? COLORS.primary : COLORS.textSecondary}
+                                        size={24}
+                                    />
+                                    <Text style={[styles.roleText, role === 'client' && styles.roleTextSelected]}>
+                                        Client
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.roleBox, role === 'worker' && styles.roleBoxSelected]}
+                                    onPress={() => setRole('worker')}
+                                    disabled={loading}
+                                >
+                                    <Icon
+                                        name="cog"
+                                        type="font-awesome-5"
+                                        color={role === 'worker' ? COLORS.primary : COLORS.textSecondary}
+                                        size={24}
+                                    />
+                                    <Text style={[styles.roleText, role === 'worker' && styles.roleTextSelected]}>
+                                        Worker
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
 
                             {/* Agreement Checkbox */}
-                            <Checkbox.Item
-                                label="I Agree with privacy and policy"
-                                status={agree ? 'checked' : 'unchecked'}
-                                onPress={() => {
-                                    setAgree(!agree);
-                                    if (errors.agree) setErrors({...errors, agree: ''});
-                                }}
-                                style={styles.checkboxContainer}
-                                labelStyle={styles.checkboxLabel}
-                                color={COLORS.primary}
-                                uncheckedColor={COLORS.textSecondary}
-                            />
-                            <HelperText type="error" visible={!!errors.agree} style={styles.helperText}>
-                                {errors.agree}
-                            </HelperText>
+                            <View style={styles.checkboxContainer}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setAgree(!agree);
+                                        if (errors.agree) setErrors({...errors, agree: ''});
+                                    }}
+                                    style={styles.checkboxTouchTarget}
+                                    disabled={loading}
+                                >
+                                    <Icon
+                                        name={agree ? 'check-square' : 'square'}
+                                        type="font-awesome"
+                                        color={agree ? COLORS.primary : COLORS.textSecondary}
+                                        size={22}
+                                    />
+                                </TouchableOpacity>
+                                <Text style={styles.checkboxLabel}>I agree to Terms and Conditions</Text>
+                            </View>
+                            {errors.agree ? <Text style={styles.errorTextCenter}>{errors.agree}</Text> : null}
+
 
                             {/* Sign Up Button */}
-                            <Button
-                                mode="contained"
+                            <TouchableOpacity
+                                style={[styles.button, loading && styles.buttonDisabled]}
                                 onPress={handleSignup}
-                                style={styles.button}
-                                labelStyle={styles.buttonLabel}
-                                loading={loading}
                                 disabled={loading}
                             >
-                                {loading ? 'Creating Account...' : 'Sign Up'}
-                            </Button>
+                                <Text style={styles.buttonText}>
+                                    {loading ? 'Signing Up...' : 'Sign Up'}
+                                </Text>
+                            </TouchableOpacity>
 
                             {/* Login Link */}
                             <View style={styles.footerContainer}>
                                 <Text style={styles.footerText}>Already have an account? </Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                                    <Text style={styles.footerLink}>Sign in</Text>
+                                    <Text style={styles.footerLink}>Log in</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
-                    </ScrollView>
-                </KeyboardAvoidingView>
-            </View>
-        </PaperProvider>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </View>
     );
 };
 
-// --- New styles to match refer.jpg and center the form ---
+// --- Styles updated to fix duplicate key ---
 const styles = StyleSheet.create({
     root: {
         flex: 1,
         backgroundColor: COLORS.background,
-        justifyContent: 'center', // Centers vertically
-        alignItems: 'center',     // Centers horizontally
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    container: {
+    keyboardView: {
         width: '100%',
-        maxWidth: 450, // Max width of the form on large screens
-        height: '100%',
+        flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
-        justifyContent: 'center', // Center content within ScrollView
-        padding: 30,
-        paddingVertical: 60, // Give more space
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    container: {
+        width: '90%',
+        maxWidth: 400,
+        backgroundColor: COLORS.container,
+        borderRadius: 16,
+        padding: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    logoPlaceholder: {
+        width: 60,
+        height: 30,
+        alignSelf: 'center',
+        marginBottom: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     title: {
-        fontSize: 34,
+        fontSize: 24,
         fontWeight: 'bold',
         color: COLORS.text,
-        marginBottom: 30,
-        alignSelf: 'flex-start',
+        textAlign: 'center',
+        marginBottom: 24,
     },
     formContainer: {
         width: '100%',
     },
+    inputContainer: {
+        marginBottom: 5,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.inputBorder,
+        paddingBottom: 8,
+        marginBottom: 5,
+    },
+    label: {
+        fontSize: 14,
+        color: COLORS.label,
+        fontWeight: '500',
+    },
+    // --- RENAMED: This is the first 'input' style ---
+    inputRowField: {
+        flex: 1,
+        textAlign: 'right',
+        fontSize: 14,
+        color: COLORS.text,
+        marginLeft: 16,
+        height: 40,
+    },
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        gap: 16, // Add gap between inputs
+        marginHorizontal: -6,
     },
     inputHalf: {
         flex: 1,
-        backgroundColor: COLORS.inputBackground,
+        marginHorizontal: 6,
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        borderBottomWidth: 0,
+        paddingBottom: 0,
     },
-    input: {
-        backgroundColor: COLORS.inputBackground,
-        marginBottom: 4,
-    },
-    helperText: {
-        marginBottom: 8,
-        marginTop: -4, // Adjust spacing
-    },
-    radioLabel: {
-        color: COLORS.textSecondary,
-        fontSize: 16,
-        marginTop: 10,
-        marginBottom: 5,
-    },
-    radioContainer: {
-        flexDirection: 'row', // Keep side-by-side
-        justifyContent: 'flex-start', // Align left
-        marginBottom: 10,
-    },
-    radioButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 20, // Space between radio buttons
-    },
-    radioText: {
-        color: COLORS.textSecondary,
+    // --- RENAMED: This is the second 'input' style ---
+    inputField: {
+        backgroundColor: COLORS.container,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.inputBorder,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
         fontSize: 14,
-        marginLeft: 0, // Let RadioButton handle spacing
+        color: COLORS.text,
+        textAlign: 'left',
+        height: 40,
+    },
+    errorText: {
+        color: COLORS.error,
+        fontSize: 12,
+        marginBottom: 10,
+        marginLeft: 4,
+    },
+    errorTextCenter: {
+        color: COLORS.error,
+        fontSize: 12,
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+    roleTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.text,
+        textAlign: 'center',
+        marginBottom: 12,
+        marginTop: 10,
+    },
+    roleContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginBottom: 20,
+    },
+    roleBox: {
+        borderWidth: 2,
+        borderColor: COLORS.inputBorder,
+        backgroundColor: COLORS.inputBg,
+        borderRadius: 12,
+        paddingVertical: 20,
+        alignItems: 'center',
+        width: '47%',
+    },
+    roleBoxSelected: {
+        borderColor: COLORS.roleSelectedBorder,
+        backgroundColor: COLORS.roleSelectedBg,
+    },
+    roleText: {
+        marginTop: 8,
+        fontSize: 14,
+        fontWeight: '500',
+        color: COLORS.textSecondary,
+    },
+    roleTextSelected: {
+        color: COLORS.primary,
     },
     checkboxContainer: {
-        paddingVertical: 0,
-        marginLeft: -12, // Align checkbox better
-        marginTop: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
+        justifyContent: 'center',
+    },
+    checkboxTouchTarget: {
+        padding: 5,
+        marginRight: 8,
     },
     checkboxLabel: {
-        color: COLORS.textSecondary,
         fontSize: 14,
-        textAlign: 'left', // Ensure text aligns left
+        color: COLORS.label,
     },
     button: {
         backgroundColor: COLORS.primary,
-        borderRadius: 12,
-        paddingVertical: 8,
-        marginTop: 20,
+        paddingVertical: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        marginTop: 15,
+        marginBottom: 20,
     },
-    buttonLabel: {
-        fontSize: 18,
+    buttonDisabled: {
+        opacity: 0.7,
+    },
+    buttonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
         fontWeight: 'bold',
-        color: COLORS.text,
     },
     footerContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 30,
     },
     footerText: {
-        fontSize: 16,
+        fontSize: 14,
         color: COLORS.textSecondary,
     },
     footerLink: {
-        fontSize: 16,
+        fontSize: 14,
         color: COLORS.primary,
         fontWeight: 'bold',
+        marginLeft: 4,
     },
 });
 

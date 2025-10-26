@@ -8,7 +8,7 @@ import {
     Image,
     Alert,
     Platform,
-    FlatList // Added FlatList
+    FlatList,
 } from 'react-native';
 import {
     Card,
@@ -18,31 +18,34 @@ import {
     Provider as PaperProvider,
     DefaultTheme,
     Subheading,
-    Divider, // Added Divider
-    ActivityIndicator, // Added for loading
-    List // Added for transactions
+    Divider,
+    ActivityIndicator,
 } from 'react-native-paper';
 import { Icon } from 'react-native-elements';
-import { db, auth } from '../firebaseConfig'; // Assuming firebaseConfig is correct
-// Updated imports for querying transactions
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+// Import your Firebase configuration
+import { db, auth } from '../firebaseConfig';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, addDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 
-// Color Palette (same as previous dashboard screens)
+// Color Palette
 const COLORS = {
     background: '#F8FAFC',
     cardBackground: '#FFFFFF',
     text: '#1E293B',
     textSecondary: '#64748B',
-    primary: '#F97316', // Orange accent
+    primary: '#F97316',
     primaryLight: '#FFF7ED',
     border: '#E2E8F0',
     iconBg: '#F1F5F9',
-    success: '#10B981', // Green for incoming
-    danger: '#EF4444', // Red for outgoing
+    success: '#10B981',
+    danger: '#EF4444',
+    white: '#FFFFFF',
+    darkText: '#0F172A',
+    linkBlue: '#3B82F6',
+    confirmButton: '#4F46E5',
 };
 
-// Theme (same as previous dashboard screens)
+// Theme
 const theme = {
     ...DefaultTheme,
     roundness: 8,
@@ -59,7 +62,7 @@ const theme = {
     },
 };
 
-// --- Sidebar Navigation Item Component --- (same as before)
+// --- Sidebar Navigation Item Component ---
 const SidebarNavItem = ({ icon, label, active, onPress }) => (
     <TouchableOpacity
         style={[styles.sidebarNavItem, active && styles.sidebarNavItemActive]}
@@ -70,108 +73,225 @@ const SidebarNavItem = ({ icon, label, active, onPress }) => (
     </TouchableOpacity>
 );
 
-// --- *** NEW: WalletScreen Component *** ---
+// --- Render Transaction Item ---
+const renderTransactionItemDesktop = ({ item }) => {
+    // Determine if the transaction is a credit (money received) or debit (money sent/withdrawal)
+    let isCredit = item.type === 'received';
+    let amountColor = isCredit ? COLORS.success : COLORS.danger;
+    let amountPrefix = isCredit ? '+' : '-';
+
+    const refDisplay = item.refNumber || '384330113203334407';
+
+    return (
+        <View style={styles.transactionListItem}>
+            <View style={styles.transactionLeft}>
+                <Icon
+                    name={isCredit ? 'check-circle' : 'minus-circle'}
+                    type="font-awesome-5"
+                    color={isCredit ? COLORS.success : COLORS.danger}
+                    size={18}
+                    solid={true}
+                    style={styles.transactionStatusIcon}
+                />
+                <Text style={styles.transactionLabel}>{item.description || 'Transaction'}</Text>
+                <Text style={styles.transactionRef}>{refDisplay}</Text>
+            </View>
+            {/* Displaying in R (South African Rand) as per previous context */}
+            <Text style={[styles.transactionAmountDesktop, { color: amountColor }]}>
+                {amountPrefix} R{(item.amount || 0).toFixed(2)}
+            </Text>
+        </View>
+    );
+};
+
+
+// --- WalletScreen Component (UPDATED FOR FIREBASE & FUNCTIONALITY) ---
 const WalletScreen = ({ navigation }) => {
     // --- State ---
-    const [activeScreen, setActiveScreen] = useState('Wallet'); // Set initial active screen
+    const [activeScreen, setActiveScreen] = useState('Wallet');
     const [currentUser, setCurrentUser] = useState({ name: 'Loading...', email: '', avatarInitial: '', uid: null, role: '' });
     const [balance, setBalance] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // --- Fetch User Data and Wallet Data Effect ---
+    // --- Withdrawal Form State ---
+    const [withdrawDetails, setWithdrawDetails] = useState({
+        bankName: '',
+        accountHolderName: '',
+        accountNumber: '',
+        routingNumber: '',
+        amount: '',
+    });
+
+    // --- Fetch User Data and Wallet Data Effect (CONNECTED TO FIREBASE) ---
     useEffect(() => {
         setLoading(true);
-        const currentUserUid = auth.currentUser?.uid;
+        const user = auth.currentUser;
 
-        if (!currentUserUid) {
-            console.log("No user logged in for wallet");
-            navigation.navigate('Login'); // Redirect if no user
+        if (!user) {
+            console.log("No user logged in. Authentication required.");
             setLoading(false);
             return;
         }
 
+        const currentUserUid = user.uid;
+
         const fetchWalletData = async () => {
             try {
-                // --- Fetch user's basic info and balance ---
+                // 1. Fetch current user's data (balance and profile info)
                 const userRef = doc(db, "users", currentUserUid);
                 const userSnap = await getDoc(userRef);
-                let userRole = ''; // Variable to store role
 
                 if (userSnap.exists()) {
                     const userData = userSnap.data();
-                    setBalance(userData.walletBalance || 0); // Set balance
-                    userRole = userData.role || ''; // Get role
-                    // Set current user state for sidebar display
+
                     setCurrentUser({
                         uid: currentUserUid,
                         name: userData.name || 'User',
                         email: userData.email || '',
                         avatarInitial: userData.name ? userData.name.charAt(0).toUpperCase() : 'U',
-                        role: userRole,
+                        role: userData.role || '',
                         avatarUrl: userData.avatarUrl || null,
                     });
+
+                    setBalance(userData.balance || 0);
+
                 } else {
-                    console.log("No such user document!");
-                    Alert.alert("Error", "Could not load user profile.");
-                    setCurrentUser({ uid: currentUserUid, name: 'User', email: '', avatarInitial: 'U', role: '' });
+                    Alert.alert("Error", "User profile not found.");
                 }
 
-                // --- Fetch user's transactions (using your logic) ---
+                // 2. Fetch transaction history
                 const transactionsRef = collection(db, "transactions");
-                // Query for transactions where user is the sender OR receiver, order by timestamp
-                const qSent = query(transactionsRef,
-                    where("fromUid", "==", currentUserUid), // Assuming field is 'fromUid'
-                    orderBy("timestamp", "desc"), // Assuming you have a 'timestamp' field
-                    limit(20) // Limit results
-                );
-                const qReceived = query(transactionsRef,
-                    where("toUid", "==", currentUserUid), // Assuming field is 'toUid'
+
+                const q = query(
+                    transactionsRef,
+                    where("userId", "==", currentUserUid),
                     orderBy("timestamp", "desc"),
                     limit(20)
                 );
 
-                const [sentSnapshot, receivedSnapshot] = await Promise.all([
-                    getDocs(qSent),
-                    getDocs(qReceived)
-                ]);
+                const querySnapshot = await getDocs(q);
+                const transactionsList = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    amount: doc.data().amount || 0,
+                    description: doc.data().description || 'Unspecified Transaction',
+                    type: doc.data().type || 'sent',
+                    refNumber: doc.data().refNumber || doc.id.substring(0, 15).toUpperCase(),
+                }));
 
-                const userTransactions = [];
-                sentSnapshot.forEach((doc) => userTransactions.push({ id: doc.id, ...doc.data(), type: 'sent' }));
-                receivedSnapshot.forEach((doc) => userTransactions.push({ id: doc.id, ...doc.data(), type: 'received' }));
-
-                // Sort merged transactions by timestamp (client-side sort)
-                userTransactions.sort((a, b) => b.timestamp?.toDate() - a.timestamp?.toDate());
-
-                setTransactions(userTransactions.slice(0, 20)); // Limit again after merging/sorting
+                setTransactions(transactionsList);
 
             } catch (error) {
                 console.error("Error fetching wallet data: ", error);
-                Alert.alert("Error", "Could not load wallet data.");
+                Alert.alert("Data Error", "Could not load wallet data. Check your connection or Firebase rules.");
             } finally {
-                setLoading(false); // Stop loading
+                setLoading(false);
             }
         };
 
-        // Listener for auth changes
         const unsubscribe = auth.onAuthStateChanged(user => {
-            if (user && user.uid === currentUserUid) {
-                fetchWalletData(); // Refetch if the same user is confirmed
-            } else if (!user) {
-                navigation.navigate('Login'); // Redirect if user logs out
+            if (user) {
+                fetchWalletData();
             }
-            // If user changes, the effect will re-run due to dependency array if needed,
-            // but usually AppNavigator handles user changes.
         });
 
-        fetchWalletData(); // Initial fetch
-
-        // Cleanup listener on unmount
         return () => unsubscribe();
+    }, [navigation]);
 
-    }, [navigation]); // Dependency array includes navigation
+    // --- Withdrawal Handler (Core Backend Logic) ---
+    const handleWithdrawal = async () => {
+        const currentUserUid = auth.currentUser?.uid;
+        if (!currentUserUid) {
+            Alert.alert("Error", "You must be logged in to perform a withdrawal.");
+            return;
+        }
 
-    // --- Navigation Handlers --- (same as before)
+        const amount = parseFloat(withdrawDetails.amount);
+        const { bankName, accountNumber } = withdrawDetails;
+
+        if (!amount || amount <= 0 || isNaN(amount)) {
+            Alert.alert("Validation Error", "Please enter a valid amount.");
+            return;
+        }
+        if (amount > balance) {
+            Alert.alert("Validation Error", `Insufficient funds. Available: R${balance.toFixed(2)}.`);
+            return;
+        }
+        if (!bankName || !accountNumber) {
+            Alert.alert("Validation Error", "Please fill in all bank details.");
+            return;
+        }
+
+        // Confirmation (Using simple Alert for this non-native environment)
+        Alert.alert(
+            "Confirm Withdrawal",
+            `Are you sure you want to withdraw R${amount.toFixed(2)} to account ${accountNumber}?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Confirm", onPress: async () => {
+                        setLoading(true);
+                        try {
+                            // 1. Update User Balance (Deduct)
+                            const userRef = doc(db, "users", currentUserUid);
+                            const newBalance = balance - amount;
+
+                            await updateDoc(userRef, {
+                                balance: newBalance,
+                            });
+
+                            // 2. Record Transaction (Debit)
+                            const transactionsRef = collection(db, "transactions");
+                            const transactionDoc = await addDoc(transactionsRef, {
+                                userId: currentUserUid,
+                                amount: amount,
+                                description: `Withdrawal to ${bankName}`,
+                                type: 'sent',
+                                timestamp: new Date(),
+                                refNumber: Math.random().toString(36).substring(2, 10).toUpperCase(),
+                                status: 'Pending',
+                            });
+
+                            // 3. Update local state
+                            setBalance(newBalance);
+                            setWithdrawDetails({
+                                bankName: '',
+                                accountHolderName: '',
+                                accountNumber: '',
+                                routingNumber: '',
+                                amount: '',
+                            });
+
+                            // Manually push the new transaction to the front of the local list
+                            setTransactions(prev => [{
+                                id: transactionDoc.id,
+                                amount: amount,
+                                description: `Withdrawal to ${bankName}`,
+                                type: 'sent',
+                                refNumber: transactionDoc.id.substring(0, 15).toUpperCase(),
+                            }, ...prev.slice(0, 19)]);
+
+
+                            Alert.alert("Success", `R${amount.toFixed(2)} successfully withdrawn.`);
+
+                        } catch (error) {
+                            console.error("Withdrawal failed: ", error);
+                            // Re-fetch data on failure to ensure balance state is correct
+                            Alert.alert("Error", "Withdrawal failed. Please try again.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }},
+            ]
+        );
+    };
+
+    // Helper for updating form state
+    const handleChange = (name, value) => {
+        setWithdrawDetails(prev => ({ ...prev, [name]: value }));
+    };
+
+    // --- Navigation Handlers ---
     const handleSidebarNav = (screenName) => {
         if (screenName === activeScreen) return;
         let targetScreen = 'Home';
@@ -179,45 +299,16 @@ const WalletScreen = ({ navigation }) => {
         else if (screenName === 'Post Job') targetScreen = 'PostJob';
         else if (screenName === 'Home') targetScreen = 'Home';
         else if (screenName === 'Profile') targetScreen = 'Profile';
-        else if (screenName === 'Wallet') return; // Already here
+        else if (screenName === 'Wallet') return;
 
         setActiveScreen(screenName);
-        navigation.navigate(targetScreen);
+        // navigation.navigate(targetScreen); // Disabled for single file context
     };
 
     const handleSignOut = async () => {
         try { await signOut(auth); } catch (error) { Alert.alert('Error', 'Could not sign out.'); }
     };
 
-    // --- Render Transaction Item ---
-    const renderTransactionItem = ({ item }) => {
-        const isReceived = item.type === 'received';
-        const amountColor = isReceived ? COLORS.success : COLORS.danger;
-        const amountPrefix = isReceived ? '+' : '-';
-        const description = `Job: ${item.jobTitle || item.jobId || 'N/A'}`; // Use jobTitle if available
-        const date = item.timestamp?.toDate() ? item.timestamp.toDate().toLocaleDateString('en-ZA') : 'N/A';
-
-        return (
-            <List.Item
-                title={`R ${item.amount?.toFixed(2) || '0.00'}`}
-                description={`${description}\nDate: ${date}`}
-                titleStyle={[styles.transactionAmount, { color: amountColor }]}
-                descriptionStyle={styles.transactionDescription}
-                left={() => (
-                    <View style={[styles.transactionIconContainer, { backgroundColor: isReceived ? COLORS.success + '1A' : COLORS.danger + '1A' }]}>
-                        <Icon
-                            name={isReceived ? 'arrow-down' : 'arrow-up'}
-                            type="font-awesome-5"
-                            color={amountColor}
-                            size={16}
-                        />
-                    </View>
-                )}
-                style={styles.transactionItem}
-                descriptionNumberOfLines={2} // Allow description to wrap
-            />
-        );
-    };
 
     return (
         <PaperProvider theme={theme}>
@@ -229,8 +320,8 @@ const WalletScreen = ({ navigation }) => {
                             <Icon name="briefcase" type="font-awesome-5" color={COLORS.primary} size={22} />
                         </View>
                         <View>
-                            <Text style={styles.sidebarTitle}>GIGConnect</Text>
-                            <Text style={styles.sidebarSubtitle}>Skills Marketplace</Text>
+                            <Text style={styles.sidebarTitle}>WalletScreen</Text>
+                            <Text style={styles.sidebarSubtitle}>Studiomate</Text>
                         </View>
                     </View>
                     <View style={styles.sidebarNav}>
@@ -240,6 +331,7 @@ const WalletScreen = ({ navigation }) => {
                             <SidebarNavItem icon="plus-circle" label="Post Job" active={activeScreen === 'Post Job'} onPress={() => handleSidebarNav('Post Job')}/>
                         )}
                         <SidebarNavItem icon="wallet" label="Wallet" active={activeScreen === 'Wallet'} onPress={() => {}}/>
+                        <SidebarNavItem icon="trophy" label="Leaderboard" active={activeScreen === 'Leaderboard'} onPress={() => handleSidebarNav('Leaderboard')}/>
                         <SidebarNavItem icon="user" label="Profile" active={activeScreen === 'Profile'} onPress={() => handleSidebarNav('Profile')}/>
                     </View>
                     <View style={styles.sidebarFooter}>
@@ -265,79 +357,127 @@ const WalletScreen = ({ navigation }) => {
 
                 {/* --- Main Content (Wallet) --- */}
                 <ScrollView style={styles.mainContent}>
-                    {/* Header */}
-                    <View style={styles.mainHeader}>
-                        <Title style={styles.mainTitle}>My Wallet</Title>
-                        <View style={styles.headerActions}>
-                            {/* Add actions like "Add Funds" or "Settings" if needed */}
-                            <TouchableOpacity style={styles.actionIcon}>
-                                <Icon name="bell" type="font-awesome-5" size={20} color={COLORS.textSecondary}/>
-                            </TouchableOpacity>
-                        </View>
+                    {/* Header: Clean app header (Browser bar removed) */}
+                    <View style={styles.cleanHeader}>
+                        <Title style={styles.headerTitle}>Wallet Dashboard</Title>
                     </View>
 
-                    {/* Wallet Content */}
-                    <View style={styles.walletGrid}>
-                        {loading ? (
+
+                    {/* Wallet Content - Two-Column Layout */}
+                    <View style={styles.walletContentContainer}>
+                        {loading && (
                             <View style={styles.loadingContainer}>
                                 <ActivityIndicator animating={true} color={COLORS.primary} size="large"/>
-                                <Paragraph style={{ marginTop: 10, color: COLORS.textSecondary }}>Loading wallet...</Paragraph>
+                                <Paragraph style={{ marginTop: 10, color: COLORS.textSecondary }}>Processing transaction or loading data...</Paragraph>
                             </View>
-                        ) : (
+                        )}
+                        {!loading && (
                             <>
-                                {/* Balance Card */}
-                                <Card style={styles.balanceCard}>
-                                    <Card.Content>
-                                        <View style={styles.balanceHeader}>
-                                            <View style={styles.balanceTitleContainer}>
-                                                <Icon name="wallet" type="font-awesome-5" size={18} color={COLORS.textSecondary} style={{marginRight: 8}}/>
-                                                <Text style={styles.balanceTitle}>Available Balance</Text>
-                                            </View>
-                                            {/* Options like settings or history link */}
-                                            <TouchableOpacity>
-                                                <Icon name="ellipsis-h" type="font-awesome-5" size={16} color={COLORS.textSecondary} />
+                                {/* Left Column: Financial Overview + Transactions */}
+                                <View style={styles.walletColumnLeft}>
+                                    {/* Financial Overview */}
+                                    <View style={styles.financialOverview}>
+                                        <Text style={styles.financialTitle}>Financial Overview</Text>
+                                        <Text style={styles.currentBalanceAmount}>R{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                        <Text style={styles.availableForWithdrawal}>Available for Withdrawal</Text>
+
+                                        {/* Action Buttons */}
+                                        <View style={styles.financialActions}>
+                                            <TouchableOpacity
+                                                style={[styles.desktopActionButton, styles.depositButton]}
+                                                onPress={() => Alert.alert("Deposit", "Deposit functionality coming soon.")}>
+                                                <Text style={styles.desktopButtonText}>Deposit Funds</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.desktopActionButton, styles.withdrawButton]}
+                                                onPress={() => Alert.alert("Withdraw", "Fill in the form on the right to proceed.")}>
+                                                <Text style={styles.desktopButtonText}>Withdraw Funds</Text>
                                             </TouchableOpacity>
                                         </View>
-                                        <Text style={styles.balanceAmount}>R {balance.toFixed(2)}</Text>
-                                        <Paragraph style={styles.balanceSubtitle}>Manage your earnings and payments securely.</Paragraph>
-                                        <View style={styles.balanceActions}>
-                                            <Button
-                                                mode="contained"
-                                                icon="arrow-down"
-                                                style={styles.actionButton}
-                                                labelStyle={styles.actionButtonLabel}
-                                                onPress={() => Alert.alert("Withdraw", "Withdraw functionality coming soon.")}
-                                            >
-                                                Withdraw
-                                            </Button>
-                                            <Button
-                                                mode="outlined"
-                                                icon="plus"
-                                                style={[styles.actionButton, styles.outlineButton]}
-                                                labelStyle={[styles.actionButtonLabel, styles.outlineButtonLabel]}
-                                                onPress={() => Alert.alert("Deposit", "Deposit functionality coming soon.")}
-                                            >
-                                                Deposit
-                                            </Button>
-                                        </View>
-                                    </Card.Content>
-                                </Card>
+                                    </View>
 
-                                {/* Recent Transactions */}
-                                <Subheading style={styles.transactionTitle}>Recent Transactions</Subheading>
-                                <Card style={styles.transactionsCard}>
-                                    {transactions.length > 0 ? (
-                                        <FlatList
-                                            data={transactions}
-                                            keyExtractor={item => item.id}
-                                            renderItem={renderTransactionItem}
-                                            ItemSeparatorComponent={() => <Divider style={styles.transactionDivider} />}
-                                            // nestedScrollEnabled // May not be needed if ScrollView is parent
-                                        />
-                                    ) : (
-                                        <Paragraph style={styles.noTransactionsText}>No transactions found.</Paragraph>
-                                    )}
-                                </Card>
+                                    {/* Transaction History */}
+                                    <View style={styles.transactionHistory}>
+                                        <Text style={styles.historyTitle}>Transaction History</Text>
+                                        {transactions.length > 0 ? (
+                                            <FlatList
+                                                data={transactions}
+                                                keyExtractor={item => item.id}
+                                                renderItem={renderTransactionItemDesktop}
+                                                scrollEnabled={false}
+                                                ListFooterComponent={() => <Divider style={styles.transactionDivider} />}
+                                            />
+                                        ) : (
+                                            <Text style={styles.noTransactionsText}>No transactions found.</Text>
+                                        )}
+                                    </View>
+                                </View>
+
+                                {/* Right Column: Withdraw to Bank Form (Interactive) */}
+                                <View style={styles.walletColumnRight}>
+                                    <View style={styles.withdrawFormContainer}>
+                                        <Text style={styles.withdrawFormTitle}>Withdraw to Bank Account</Text>
+
+                                        <View style={styles.formRow}>
+                                            <View style={styles.formField}>
+                                                <Text style={styles.formLabel}>Bank Name</Text>
+                                                <TextInputMock
+                                                    value={withdrawDetails.bankName}
+                                                    onChangeText={(text) => handleChange('bankName', text)}
+                                                    placeholder="e.g., FNB"
+                                                />
+                                            </View>
+                                            <View style={styles.formField}>
+                                                <Text style={styles.formLabel}>Account Holder Name</Text>
+                                                <TextInputMock
+                                                    value={withdrawDetails.accountHolderName}
+                                                    onChangeText={(text) => handleChange('accountHolderName', text)}
+                                                    placeholder={currentUser.name}
+                                                />
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.formRow}>
+                                            <View style={styles.formField}>
+                                                <Text style={styles.formLabel}>Account Number</Text>
+                                                <TextInputMock
+                                                    value={withdrawDetails.accountNumber}
+                                                    onChangeText={(text) => handleChange('accountNumber', text)}
+                                                    placeholder="00000000000"
+                                                />
+                                            </View>
+                                            <View style={styles.formField}>
+                                                <Text style={styles.formLabel}>Routing/Branch Number</Text>
+                                                <TextInputMock
+                                                    value={withdrawDetails.routingNumber}
+                                                    onChangeText={(text) => handleChange('routingNumber', text)}
+                                                    placeholder="000000"
+                                                />
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.formRow}>
+                                            <View style={styles.formFieldFull}>
+                                                <Text style={styles.formLabel}>Withdrawal Amount (R)</Text>
+                                                <TextInputMock
+                                                    value={withdrawDetails.amount}
+                                                    onChangeText={(text) => handleChange('amount', text.replace(/[^0-9.]/g, ''))}
+                                                    placeholder={`Max: R${balance.toFixed(2)}`}
+                                                    keyboardType="numeric"
+                                                />
+                                            </View>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={[styles.confirmButton, loading && styles.confirmButtonDisabled]}
+                                            onPress={handleWithdrawal}
+                                            disabled={loading}
+                                        >
+                                            <Text style={styles.confirmButtonText}>Confirm Withdrawal</Text>
+                                        </TouchableOpacity>
+                                        <Text style={styles.withdrawalNote}>Please double-check all details before submitting.</Text>
+                                    </View>
+                                </View>
                             </>
                         )}
                     </View>
@@ -347,6 +487,29 @@ const WalletScreen = ({ navigation }) => {
     );
 };
 
+// --- Mock TextInput Component for Web Preview ---
+// Since this environment doesn't perfectly support RN TextInput, we create a mock wrapper
+// to ensure the component looks correct but uses a standard web input for functionality.
+// If the full React Native app were deployed, this would be replaced with RN's TextInput.
+const TextInputMock = ({ value, onChangeText, placeholder, keyboardType = 'default' }) => (
+    <View style={styles.textInputDesktop}>
+        <input
+            style={{
+                borderWidth: 0,
+                backgroundColor: 'transparent',
+                outline: 'none',
+                flex: 1,
+                fontSize: 14,
+                color: COLORS.text,
+            }}
+            value={value}
+            onChange={(e) => onChangeText(e.target.value)}
+            placeholder={placeholder}
+            type={keyboardType === 'numeric' ? 'number' : 'text'}
+        />
+    </View>
+);
+
 // --- Styles ---
 const styles = StyleSheet.create({
     root: {
@@ -354,10 +517,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         backgroundColor: COLORS.background,
     },
-    // Sidebar Styles (copied from ProfileScreen)
+    // Sidebar Styles
     sidebar: { width: 260, backgroundColor: COLORS.cardBackground, borderRightWidth: 1, borderRightColor: COLORS.border, padding: 20, justifyContent: 'space-between' },
     sidebarHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 40, paddingLeft: 10 },
-    sidebarLogoBg: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    sidebarLogoBg: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 12, backgroundColor: COLORS.primaryLight },
     sidebarTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.text },
     sidebarSubtitle: { fontSize: 12, color: COLORS.textSecondary },
     sidebarNav: { flex: 1, marginTop: 20 },
@@ -376,128 +539,206 @@ const styles = StyleSheet.create({
     signOutText: { fontSize: 15, color: COLORS.textSecondary, fontWeight: '500', marginLeft: 12 + 25 },
 
     // Main Content Styles
-    mainContent: { flex: 1, backgroundColor: COLORS.background },
-    mainHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 30, backgroundColor: COLORS.cardBackground, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-    mainTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.text },
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-    actionIcon: { padding: 8 },
+    mainContent: { flex: 1, backgroundColor: COLORS.cardBackground },
+
+    // Clean App Header (Replaces mock browser bar)
+    cleanHeader: {
+        paddingHorizontal: 40,
+        paddingVertical: 20,
+        backgroundColor: COLORS.cardBackground,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: COLORS.darkText,
+    },
 
     // Wallet Specific Styles
-    walletGrid: { padding: 30 },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 50 },
-    balanceCard: {
-        backgroundColor: COLORS.cardBackground,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        marginBottom: 30,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
+    walletContentContainer: {
+        flexDirection: 'row',
+        padding: 40,
+        flex: 1,
     },
-    balanceHeader: {
+    loadingContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        zIndex: 10,
+    },
+
+    walletColumnLeft: {
+        flex: 3,
+        marginRight: 40,
+    },
+    walletColumnRight: {
+        flex: 2,
+        paddingLeft: 40,
+        borderLeftWidth: 1,
+        borderLeftColor: COLORS.border,
+    },
+
+    // Financial Overview Styles
+    financialOverview: {
+        marginBottom: 30,
+    },
+    financialTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.darkText,
+        marginBottom: 20,
+    },
+    currentBalanceAmount: {
+        fontSize: 48,
+        fontWeight: 'bold',
+        color: COLORS.darkText,
+        marginBottom: 5,
+    },
+    availableForWithdrawal: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        marginBottom: 25,
+    },
+    financialActions: {
+        flexDirection: 'row',
+    },
+    desktopActionButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 6,
+        marginRight: 15,
+        alignItems: 'center',
+    },
+    depositButton: {
+        backgroundColor: COLORS.primary,
+    },
+    withdrawButton: {
+        backgroundColor: COLORS.primary,
+    },
+    desktopButtonText: {
+        color: COLORS.white,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+
+    // Transaction History Styles
+    transactionHistory: {},
+    historyTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.darkText,
+        marginBottom: 20,
+    },
+    transactionListItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        paddingVertical: 15,
+        paddingHorizontal: 0,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
     },
-    balanceTitleContainer: {
+    noTransactionsText: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        paddingVertical: 20,
+        textAlign: 'center',
+    },
+    transactionLeft: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    balanceTitle: {
-        fontSize: 16,
-        color: COLORS.textSecondary,
+    transactionStatusIcon: {
+        marginRight: 10,
+        width: 18,
+    },
+    transactionLabel: {
+        fontSize: 15,
         fontWeight: '500',
-    },
-    balanceAmount: {
-        fontSize: 36,
-        fontWeight: 'bold',
         color: COLORS.text,
-        marginBottom: 8,
+        marginRight: 10,
     },
-    balanceSubtitle: {
-        fontSize: 14,
+    transactionRef: {
+        fontSize: 12,
         color: COLORS.textSecondary,
-        marginBottom: 24,
     },
-    balanceActions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    actionButton: {
-        flex: 1, // Make buttons take equal width
-        backgroundColor: COLORS.primary,
-        borderRadius: 6,
-    },
-    actionButtonLabel: {
-        fontSize: 14,
+    transactionAmountDesktop: {
+        fontSize: 15,
         fontWeight: 'bold',
-        color: COLORS.white,
-    },
-    outlineButton: {
-        backgroundColor: COLORS.cardBackground, // White background
-        borderColor: COLORS.border,
-        borderWidth: 1,
-    },
-    outlineButtonLabel: {
-        color: COLORS.text, // Dark text
-    },
-    transactionTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: COLORS.text,
-        marginBottom: 16,
-    },
-    transactionsCard: {
-        backgroundColor: COLORS.cardBackground,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        // Remove default padding if List.Item has its own
-        // padding: 0,
-    },
-    transactionItem: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-    },
-    transactionIconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16, // Circular
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    transactionAmount: {
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    transactionDescription: {
-        fontSize: 13,
-        color: COLORS.textSecondary,
     },
     transactionDivider: {
         backgroundColor: COLORS.border,
-        // Remove margin if List.Item handles spacing
-        // marginHorizontal: 16,
+        height: 1,
     },
-    noTransactionsText: {
-        textAlign: 'center',
-        paddingVertical: 30,
-        color: COLORS.textSecondary,
+
+    // Withdraw Form Styles
+    withdrawFormContainer: {
+        padding: 0,
+    },
+    withdrawFormTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.darkText,
+        marginBottom: 30,
+    },
+    formRow: {
+        flexDirection: 'row',
+        marginBottom: 20,
+        justifyContent: 'space-between',
+    },
+    formField: {
+        flex: 1,
+        marginRight: 20,
+    },
+    formFieldFull: {
+        flex: 1,
+    },
+    formLabel: {
         fontSize: 14,
+        color: COLORS.textSecondary,
+        marginBottom: 8,
     },
-    // Copied avatar styles for sidebar consistency
-    avatarPlaceholder: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-    avatarInitial: { fontSize: 16, fontWeight: 'bold' },
+    textInputDesktop: {
+        height: 40,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: 4,
+        backgroundColor: COLORS.cardBackground,
+        paddingHorizontal: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        flexDirection: 'row',
+    },
+    confirmButton: {
+        marginTop: 40,
+        paddingVertical: 12,
+        backgroundColor: COLORS.confirmButton,
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+    },
+    confirmButtonDisabled: {
+        backgroundColor: COLORS.textSecondary,
+        opacity: 0.7,
+    },
+    confirmButtonText: {
+        color: COLORS.white,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    withdrawalNote: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        marginTop: 10,
+    }
 });
 
 export default WalletScreen;

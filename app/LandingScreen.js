@@ -12,7 +12,6 @@ import {
 import { Icon } from 'react-native-elements';
 import { LinearGradient } from 'expo-linear-gradient';
 
-
 // Define your color palette based on the screenshots
 const COLORS = {
     primary: '#7F56D9', // Main purple
@@ -26,8 +25,7 @@ const COLORS = {
 
 const LandingScreen = ({ navigation }) => {
     // State for active navigation tab
-    const [activeTab, setActiveTab] = useState('Home');
-
+    const [activeTab, setActiveTab] = [useState('Home')];
 
     // Helper component for navigation links
     const NavItem = ({ title }) => (
@@ -89,13 +87,13 @@ const LandingScreen = ({ navigation }) => {
                 <View style={styles.authButtons}>
                     <TouchableOpacity
                         style={styles.logInButton}
-                        onPress={() => navigation.navigate('Login')}
+                        onPress={() => navigation.navigate('RoleSelectionLoginScreen')}
                     >
                         <Text style={styles.logInText}>Log In</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.signUpButton}
-                        onPress={() => navigation.navigate('Signup')}
+                        onPress={() => navigation.navigate('RoleSelectionLoginScreen')}
                     >
                         <Text style={styles.signUpText}>Sign Up</Text>
                     </TouchableOpacity>
@@ -150,12 +148,11 @@ const LandingScreen = ({ navigation }) => {
 
             {/* Stats Section */}
             <View style={styles.statsSection}>
-                <StatItem icon="users" number="2.9M" label="Informal Workers in SA" />
-                <StatItem icon="shopping-bag" number="18%" label="Of Total Employment" />
-                <StatItem icon="mobile-alt" number="25%" label="Use Digital Platforms" />
-                <StatItem icon="coins" number="R3,500–R5,000" label="Average Monthly Income" />
+                <StatItem icon="users" number="10,000+" label="Verified Workers" />
+                <StatItem icon="check-circle" number="5,000+" label="Jobs Completed" />
+                <StatItem icon="dollar-sign" number="R2M+" label="Total Payments" />
+                <StatItem icon="star" number="98%" label="Satisfaction Rate" />
             </View>
-
 
             {/* Find Jobs Section */}
             <PlaceholderSection
@@ -207,7 +204,7 @@ const LandingScreen = ({ navigation }) => {
                     <View style={styles.footerBrand}>
                         <View style={styles.logoContainer}>
                             <Icon name="briefcase" type="font-awesome-5" color={COLORS.primary} size={24} style={styles.logoIcon} />
-                            <Text style={[styles.logoText, { color: COLORS.white }]}>GIG Connect</Text>
+                            <Text style={[styles.logoText, {color: COLORS.white}]}>GIG Connect</Text>
                         </View>
                         <Text style={styles.footerTagline}>Empowering South Africa's workforce through innovation and technology.</Text>
                         <View style={styles.socialIcons}>
