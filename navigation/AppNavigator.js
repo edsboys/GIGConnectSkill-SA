@@ -1,3 +1,4 @@
+
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
@@ -19,6 +20,7 @@ import WalletScreen from '../app/WalletScreen';
 import ProfileScreen from '../app/ProfileScreen';
 import LandingScreen from '../app/LandingScreen';
 import RoleSelectionLoginScreen from '../app/RoleSelectionLoginScreen';
+import HomeScreen from '../app/HomeScreen';
 
 const COLORS = {
     primary: '#7F56D9',
@@ -58,6 +60,18 @@ function MainTabs() {
                 },
             }}
         >
+            <Tab.Screen
+                name="HomeScreen"
+                component={HomeScreen}
+                options={{
+                    title: 'Home',
+                    tabBarIcon: ({ color, size }) => (
+                        <MaterialCommunityIcons name="briefcase" size={size} color={color} />
+                    ),
+                    headerShown: false, // Hide header since screens have their own
+                }}
+            />
+
             <Tab.Screen
                 name="JobFeed"
                 component={JobFeed}
