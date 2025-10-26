@@ -66,6 +66,7 @@ function MainTabs() {
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons name="briefcase" size={size} color={color} />
                     ),
+                    headerShown: false, // Hide header since screens have their own
                 }}
             />
             <Tab.Screen
@@ -76,6 +77,18 @@ function MainTabs() {
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons name="trophy" size={size} color={color} />
                     ),
+                    headerShown: false,
+                }}
+            />
+            <Tab.Screen
+                name="PostJob"
+                component={PostJobScreen}
+                options={{
+                    title: 'Post Job',
+                    tabBarIcon: ({ color, size }) => (
+                        <MaterialCommunityIcons name="plus-circle" size={size} color={color} />
+                    ),
+                    headerShown: false,
                 }}
             />
             <Tab.Screen
@@ -86,6 +99,7 @@ function MainTabs() {
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons name="wallet" size={size} color={color} />
                     ),
+                    headerShown: false,
                 }}
             />
             <Tab.Screen
@@ -96,6 +110,7 @@ function MainTabs() {
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons name="account" size={size} color={color} />
                     ),
+                    headerShown: false,
                 }}
             />
         </Tab.Navigator>
@@ -149,15 +164,7 @@ function AppNavigator() {
                             options={{
                                 title: 'Job Details',
                                 headerBackTitle: 'Back',
-                            }}
-                        />
-
-                        <Stack.Screen
-                            name="PostJob"
-                            component={PostJobScreen}
-                            options={{
-                                title: 'Post New Job',
-                                headerBackTitle: 'Cancel',
+                                headerShown: false, // Hide header since screen has its own
                             }}
                         />
 
@@ -167,6 +174,7 @@ function AppNavigator() {
                             options={{
                                 title: 'Submit Proof',
                                 headerBackTitle: 'Back',
+                                headerShown: false,
                             }}
                         />
 
@@ -176,6 +184,7 @@ function AppNavigator() {
                             options={{
                                 title: 'Rate Worker',
                                 headerBackTitle: 'Back',
+                                headerShown: false,
                             }}
                         />
                     </>
@@ -205,6 +214,7 @@ function AppNavigator() {
                             options={{
                                 title: 'Create Account',
                                 headerBackTitle: 'Back',
+                                headerShown: false,
                             }}
                         />
                     </>
@@ -224,4 +234,3 @@ const styles = StyleSheet.create({
 });
 
 export default AppNavigator;
-
